@@ -1,4 +1,4 @@
-NOS
+NOS 6차
 ===
 
-NOS 6th generation
+NOS 6차 과제 제출용
