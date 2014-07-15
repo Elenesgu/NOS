@@ -1,8 +1,8 @@
 #include<iostream>
 #include<algorithm>
-#include<list>
 #include<array>
 #include<vector>
+#include<functional>
 
 using namespace std;
 
@@ -11,9 +11,14 @@ using namespace std;
 #ifdef _LOCAL
 #include<sstream>
 stringstream in("269 66	600	7	131 196 9 15	293 322 6 44	205 316 3 96	312 66 8 84	339 143 8 12	430 82 9 15	391 369 4 29");
+ostream& out = cout;
 #else
-istream& in = cin;
+#include<fstream>
+fstream in("input.txt");
+fstream out("output.txt");
 #endif
+
+
 
 typedef unsigned int num;
 
@@ -38,30 +43,39 @@ typedef array<vector<Unit>, 8> Map;
 num EnemyToMap(int X, int Y);
 
 Map EnemyMap;
+array<int, 8> DirPriority;
 Unit User;
 
 int main() {
 	num tempX, tempY, tempTime, tempExp;
-	size_t uCase;
+	size_t uCase, counter;
 
 	in >> tempX >> tempY >> tempTime;
 
 	User = Unit(tempX, tempY, tempTime);
 
 	in >> uCase;
-
-	while (uCase--) {
+	
+	counter = 0;
+	while (counter < uCase) {
 		in >> tempX >> tempY >> tempTime >> tempExp;
 		EnemyMap[EnemyToMap(tempX, tempY)].push_back(Unit(tempX, tempY, tempTime, tempExp));
+		counter++;
 	}
+	counter = 0;
+	while (counter < uCase) {
+		DirPriority[counter] = EnemyMap[counter].size();
+		counter++;
+	}
+	counter = 0;
 
 	return 0;
 }
 
 num EnemyToMap(int X, int Y) {
 	num whichMap = 0;
-	if (User.coord.x <= X) {
-		if (User.coord.y <= Y) {
+	if (static_cast<int> (User.coord.x) <= X) {
+		if (static_cast<int> (User.coord.y) <= Y) {
 			whichMap = 0;
 		}
 		else {
@@ -69,7 +83,7 @@ num EnemyToMap(int X, int Y) {
 		}
 	}
 	else {
-		if (User.coord.y <= Y) {
+		if (static_cast<int> (User.coord.y) <= Y) {
 			whichMap = 2;
 		}
 		else {
@@ -79,22 +93,22 @@ num EnemyToMap(int X, int Y) {
 
 	switch (whichMap) {
 	case 0:
-		if (Y > X + User.coord.y - User.coord.x) {
+		if (Y > X + static_cast<int> (User.coord.y) - static_cast<int> (User.coord.x)) {
 			whichMap++;
 		}
 		break;
 	case 4:
-		if (Y < X + User.coord.y - User.coord.x) {
+		if (Y < X + static_cast<int> (User.coord.y) - static_cast<int> (User.coord.x)) {
 			whichMap++;
 		}
 		break;
 	case 2:
-		if (Y < (-X) + User.coord.y + User.coord.x) {
+		if (Y < (-X) + static_cast<int> (User.coord.y) + static_cast<int> (User.coord.x)) {
 			whichMap++;
 		}
 		break;
 	case 6:
-		if (Y > (-X) + User.coord.y + User.coord.x) {
+		if (Y >(-X) + static_cast<int> (User.coord.y) + static_cast<int> (User.coord.x)) {
 			whichMap++;
 		}
 		break;
