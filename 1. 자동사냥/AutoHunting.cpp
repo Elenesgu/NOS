@@ -26,17 +26,19 @@ struct Vector2 {
 struct Unit {
 	Vector2 coord;
 	num time;
-	num exp;	
+	num exp;
+	Unit(const Unit& obj) : coord(obj.coord.x, obj.coord.y), time(obj.time), exp(obj.exp) {};
 	Unit(num ax, num ay, num atime, num aexp) : coord(ax, ay), time(atime), exp(aexp) {};
-	Unit(num ax, num ay, num atime) : Unit(ax, ay, atime) {};
+	Unit(num ax, num ay, num atime) : Unit(ax, ay, atime, 0) {};
 	Unit() : Unit(0, 0, 0, 0) {};
 };
 
 typedef array<vector<Unit>, 8> Map;
 
+num EnemyToMap(int X, int Y);
 
 Map EnemyMap;
-
+Unit User;
 
 int main() {
 	num tempX, tempY, tempTime, tempExp;
@@ -44,14 +46,58 @@ int main() {
 
 	in >> tempX >> tempY >> tempTime;
 
-	Unit User(tempX, tempY, tempTime);
+	User = Unit(tempX, tempY, tempTime);
 
 	in >> uCase;
 
 	while (uCase--) {
 		in >> tempX >> tempY >> tempTime >> tempExp;
-		EnemyMap[0].push_back(Unit(tempX, tempY, tempTime, tempExp));
+		EnemyMap[EnemyToMap(tempX, tempY)].push_back(Unit(tempX, tempY, tempTime, tempExp));
 	}
 
 	return 0;
+}
+
+num EnemyToMap(int X, int Y) {
+	num whichMap = 0;
+	if (User.coord.x <= X) {
+		if (User.coord.y <= Y) {
+			whichMap = 0;
+		}
+		else {
+			whichMap = 6;
+		}
+	}
+	else {
+		if (User.coord.y <= Y) {
+			whichMap = 2;
+		}
+		else {
+			whichMap = 4;
+		}
+	}
+
+	switch (whichMap) {
+	case 0:
+		if (Y > X + User.coord.y - User.coord.x) {
+			whichMap++;
+		}
+		break;
+	case 4:
+		if (Y < X + User.coord.y - User.coord.x) {
+			whichMap++;
+		}
+		break;
+	case 2:
+		if (Y < (-X) + User.coord.y + User.coord.x) {
+			whichMap++;
+		}
+		break;
+	case 6:
+		if (Y > (-X) + User.coord.y + User.coord.x) {
+			whichMap++;
+		}
+		break;
+	}
+	return whichMap;
 }
