@@ -2,27 +2,30 @@
 #include<algorithm>
 #include<array>
 #include<vector>
+#include<string>
 #include<functional>
 #include<cmath>
+#include<fstream>
 
 using namespace std;
 
 #ifdef _LOCAL
-#include<sstream>
-stringstream in("269 66	600	7	131 196 9 15	293 322 6 44	205 316 3 96	312 66 8 84	339 143 8 12	430 82 9 15	391 369 4 29");
+fstream in("Input.txt");
 ostream& out = cout;
 #else
-#include<fstream>
-fstream in("input.txt");
-fstream out("output.txt");
+fstream in("Input.txt");
+fstream out(Output.txt");
 #endif
 
 typedef unsigned int num;
+
+const char CRLF = '\n';
 
 struct Vector2 {
 	num x, y;
 	Vector2(num ax, num ay) :x(ax), y(ay) {};
 	Vector2() :Vector2(0, 0) {};
+	Vector2(const Vector2& obj) : Vector2(obj.x, obj.y) {};
 };
 
 struct Unit {
@@ -37,10 +40,20 @@ struct Unit {
 
 typedef array<vector<Unit>, 8> Map;
 
+Map EnemyMap;
+array<num, 8> DirPriority;
+size_t HighPriority;
+Unit User;
+vector<Unit> PriorityMap;
+string UserLog;
+num doTime;
+num Monsternum = 0;
+
+bool HuntEnd = false;
+
+auto VecAdd = [](Unit& obj) {PriorityMap.push_back(obj); };
+
 static num EnemyToMap(int X, int Y);
-
-void DoAutoHunting();
-
 
 inline static double getLength(const Vector2& origin, const Vector2& target) {
 	return sqrt(pow(static_cast<double>(origin.x) - static_cast<double> (target.x), 2)
@@ -53,25 +66,34 @@ inline static double getWeight(const Unit& origin, const Unit& target, double Le
 }
 
 inline static double getWeight(const Unit& origin, const Unit& target) {
-	return getWeight(origin, target, (getLength(origin.coord, target.coord) + target.time));
+	return getWeight(origin, target, (getLength(origin.coord, target.coord)));
 	// Reward / Time (to get the reward)
 }
 
-Map EnemyMap;
-array<num, 8> DirPriority;
-size_t HighPriority;
-Unit User;
-vector<Unit> PriorityMap;
+inline static void PrintLog(const Vector2& obj) {
+	UserLog += to_string(obj.x);
+	UserLog += " ";
+	UserLog += to_string(obj.y);
+	UserLog += CRLF;
+}
 
+static Unit& FindTarget();
+static void Hunt(Unit& enemy);
 static num doTest();
 
 int main() {
 	num tempX, tempY, tempTime, tempExp;
 	size_t uCase, counter;
+#ifdef _LOCAL
+	if (!in) {
+		out << "No File" << endl;
+		return 0;
+	}
+#endif
 
-	in >> tempX >> tempY >> tempTime;
+	in >> tempX >> tempY >> doTime;
 
-	User = Unit(tempX, tempY, tempTime);
+	User = Unit(tempX, tempY, doTime);
 
 	in >> uCase;
 	
@@ -84,7 +106,7 @@ int main() {
 	counter = 0;
 	
 	num Max = 0;
-	while (counter < uCase) {
+	while (counter < 8) {
 		DirPriority[counter] = EnemyMap[counter].size() + EnemyMap[(counter - 1) % 8].size() + EnemyMap[(counter + 1) % 8].size();
 		if (Max < DirPriority[counter]) {
 			HighPriority = counter;
@@ -92,14 +114,16 @@ int main() {
 		}
 		counter++;
 	}
-	PriorityMap.reserve(EnemyMap[HighPriority].size() * 3);
+	PriorityMap.reserve(Max * 3);
 
-	auto VecAdd = [](Unit& obj) {PriorityMap.push_back(obj); };
 	for_each(EnemyMap[HighPriority].begin(), EnemyMap[HighPriority].end(), VecAdd);
-	for_each(EnemyMap[HighPriority + 1].begin(), EnemyMap[HighPriority + 1].end(), VecAdd);
-	for_each(EnemyMap[HighPriority - 1].begin(), EnemyMap[HighPriority - 1].end(), VecAdd);
+	for_each(EnemyMap[(HighPriority + 1)%8].begin(), EnemyMap[(HighPriority + 1)%8].end(), VecAdd);
+	for_each(EnemyMap[(HighPriority - 1)%8].begin(), EnemyMap[(HighPriority - 1)%8].end(), VecAdd);
 
-	out << doTest();
+	auto result = doTest();
+	out << doTime - User.time << endl << User.exp << endl;
+
+	out << result << endl << UserLog;
 
 	return 0;
 }
@@ -148,6 +172,50 @@ static num EnemyToMap(int X, int Y) {
 	return whichMap;
 }
 
-num doTest() {
-	out << getWeight(User, PriorityMap[0]);
+static void Hunt(Unit& enemy) {
+	if (HuntEnd) {
+		return;
+	}
+	PrintLog(enemy.coord);
+	User.exp += enemy.exp;
+	enemy.exp = 0;
+	User.time -= enemy.time;
+	User.time -= static_cast<int> ( getLength(User.coord, enemy.coord) );
+	User.coord = enemy.coord;
+	Monsternum++;
 }
+
+static Unit& FindTarget() {
+	double minWeight = 0, tmp;
+
+	Unit* target = nullptr;
+	for (auto itr = PriorityMap.begin(); itr != PriorityMap.end(); itr++) {
+		tmp = getWeight(User, (*itr));
+		if (minWeight < tmp) {
+			if (getLength(User.coord, (*itr).coord) + (*itr).exp < User.time) {
+				minWeight = tmp;
+				target = &(*itr);
+			}
+		}
+	}
+	if (target == nullptr){
+		HuntEnd = true;
+	}
+	return *target;
+}
+
+static num doTest() {
+	bool Expand = true;
+	while (User.time > 0 && !HuntEnd) {
+		Hunt(FindTarget());
+		if (HuntEnd && Expand) {
+			for (int i = 2; i < 7; i++) {
+				for_each(EnemyMap[(HighPriority + i) % 8].begin(), EnemyMap[(HighPriority + i) % 8].end(), VecAdd);
+			}
+			HuntEnd = false;
+			Expand = false;
+		}
+	}
+	return Monsternum;
+}
+
