@@ -208,11 +208,10 @@ static num doTest() {
 	bool Expand = true;
 	while (User.time > 0 && !HuntEnd) {
 		Hunt(FindTarget());
-		if (HuntEnd && Expand) {
+		if (Expand) {
 			for (int i = 2; i < 7; i++) {
 				for_each(EnemyMap[(HighPriority + i) % 8].begin(), EnemyMap[(HighPriority + i) % 8].end(), VecAdd);
 			}
-			HuntEnd = false;
 			Expand = false;
 		}
 	}
