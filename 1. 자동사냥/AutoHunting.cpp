@@ -41,20 +41,29 @@ static num EnemyToMap(int X, int Y);
 
 void DoAutoHunting();
 
-inline static num getWeight(const Unit& origin, const Unit& target) {
-	return target.exp / (getLength(origin.coord, target.coord) + target.time);
+
+inline static double getLength(const Vector2& origin, const Vector2& target) {
+	return sqrt(pow(static_cast<double>(origin.x) - static_cast<double> (target.x), 2)
+		+ pow(static_cast<double>(origin.y) - static_cast<double>(target.y), 2));
+}
+
+inline static double getWeight(const Unit& origin, const Unit& target, double Length) {
+	return static_cast<double> (target.exp) / (Length + static_cast<double> (target.time)) ;
 	// Reward / Time (to get the reward)
 }
 
-inline static num getLength(const Vector2& origin, const Vector2& target) {
-	return static_cast<num> (sqrt(pow(static_cast<double>(origin.x) - static_cast<double> (target.x), 2)
-		+ pow(static_cast<double>(origin.y) - static_cast<double>(target.y), 2)));
+inline static double getWeight(const Unit& origin, const Unit& target) {
+	return getWeight(origin, target, (getLength(origin.coord, target.coord) + target.time));
+	// Reward / Time (to get the reward)
 }
 
 Map EnemyMap;
-array<int, 8> DirPriority;
+array<num, 8> DirPriority;
 size_t HighPriority;
 Unit User;
+vector<Unit> PriorityMap;
+
+static num doTest();
 
 int main() {
 	num tempX, tempY, tempTime, tempExp;
@@ -82,9 +91,15 @@ int main() {
 			Max = DirPriority[counter];
 		}
 		counter++;
-	}	
-	counter = 0;
+	}
+	PriorityMap.reserve(EnemyMap[HighPriority].size() * 3);
 
+	auto VecAdd = [](Unit& obj) {PriorityMap.push_back(obj); };
+	for_each(EnemyMap[HighPriority].begin(), EnemyMap[HighPriority].end(), VecAdd);
+	for_each(EnemyMap[HighPriority + 1].begin(), EnemyMap[HighPriority + 1].end(), VecAdd);
+	for_each(EnemyMap[HighPriority - 1].begin(), EnemyMap[HighPriority - 1].end(), VecAdd);
+
+	out << doTest();
 
 	return 0;
 }
@@ -131,4 +146,8 @@ static num EnemyToMap(int X, int Y) {
 		break;
 	}
 	return whichMap;
+}
+
+num doTest() {
+	out << getWeight(User, PriorityMap[0]);
 }
