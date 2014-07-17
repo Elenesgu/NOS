@@ -19,9 +19,6 @@ fstream out("Output.txt");
 
 typedef unsigned int num;
 
-
-const char CRLF = '\n';
-
 struct Vector2 {
 	num x, y;
 	Vector2(num ax, num ay) :x(ax), y(ay) {};
@@ -152,7 +149,7 @@ static Result doTest() {
 time_t a = time(NULL);
 
 static Result doTest(Unit Clone, Result Base) {
-#ifdef _LOCAL	;
+#ifdef _LOCAL
 	cout << time(NULL) - a << endl;
 #endif
 	vector<Result> Results;
