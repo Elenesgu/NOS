@@ -15,7 +15,7 @@ fstream in;
 ostream& out = cout;
 #else
 fstream in("Input.txt");
-fstream out("Output.txt");
+fstream out("Output.txt", ios::out);
 #endif
 
 typedef unsigned int num;
