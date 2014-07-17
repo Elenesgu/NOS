@@ -2,6 +2,7 @@
 #include<algorithm>
 #include<array>
 #include<vector>
+#include<string>
 #include<functional>
 #include<cmath>
 #include<fstream>
@@ -10,7 +11,7 @@ using namespace std;
 
 #ifdef _LOCAL
 #include<ctime>
-fstream in("Input.txt");
+fstream in;
 ostream& out = cout;
 #else
 fstream in("Input.txt");
@@ -84,6 +85,11 @@ int main() {
 	num tempX, tempY, tempTime, tempExp;
 	size_t uCase, counter;
 #ifdef _LOCAL
+	time_t a = time(NULL);
+	int inputnum;
+	out << "Case Num: ";
+	cin >> inputnum;
+	in.open("input" + to_string(inputnum) + ".txt");
 	if (!in) {
 		out << "No File" << endl;
 		return 0;
@@ -99,11 +105,15 @@ int main() {
 	if (pickCount > uCase) {
 		pickCount = uCase - 1;
 	}
+	pickCount = 20000 / uCase;
+#ifdef _LOCAL
+	out << "Branches: " << pickCount << endl;
+#endif
 
 	counter = 0;
 	while (counter < uCase) {
 		in >> tempX >> tempY >> tempTime >> tempExp;
-		EnemyMap.push_back(Unit(tempX, tempY, tempTime, tempExp, true, counter+1));
+		EnemyMap.push_back(Unit(tempX, tempY, tempTime, tempExp, true, counter + 1));
 		counter++;
 	}
 	counter = 0;
@@ -111,12 +121,24 @@ int main() {
 	num Max = 0;
 
 	auto result = doTest();
+#ifdef _LOCAL
+	out << "Time: " << result.time << endl << "EXP: " << result.exp << endl << result.Hunted.size() << endl;
+	for (auto itr = result.Hunted.begin(); itr != result.Hunted.end(); itr++) {
+		out << (*itr).x << ' ' << (*itr).y << endl;
+	}
+#else
 	out << result.time << endl << result.exp << endl << result.Hunted.size() << endl;
 	for (auto itr = result.Hunted.begin(); itr != result.Hunted.end(); itr++) {
 		out << (*itr).x << ' ' << (*itr).y << endl;
 	}
+#endif
 
-	return 0;
+#ifdef _LOCAL
+	out << "Cost: " << time(NULL) - a << endl;
+	in.close();
+#endif
+
+	return 0;	
 }
 
 static vector<UnitWeight> FindTarget(Unit origin) {
@@ -146,12 +168,7 @@ static Result doTest() {
 	return Result (doTest(User, Result()) );
 }
 
-time_t a = time(NULL);
-
 static Result doTest(Unit Clone, Result Base) {
-#ifdef _LOCAL
-	cout << time(NULL) - a << endl;
-#endif
 	vector<Result> Results;
 	vector<UnitWeight> Targets ( FindTarget(Clone) );	
 	for (size_t i = 0; i < Targets.size(); i++){
