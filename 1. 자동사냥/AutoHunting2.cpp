@@ -38,13 +38,13 @@ struct Unit {
 	Unit(const Unit& obj) : Unit(obj.coord.x, obj.coord.y, obj.time, obj.exp) {};
 };
 
-typedef array<vector<Unit>, 8> Map;
+typedef vector<Unit> Map;
+typedef pair<Unit*, double> UnitWeight;
 
 Map EnemyMap;
 array<num, 8> DirPriority;
 size_t HighPriority;
 Unit User;
-vector<Unit> PriorityMap;
 string UserLog;
 num doTime;
 num Monsternum = 0;
@@ -53,17 +53,13 @@ num pickCount;
 
 bool HuntEnd = false;
 
-auto VecAdd = [](Unit& obj) {PriorityMap.push_back(obj); };
-
-static num EnemyToMap(int X, int Y);
-
 inline static double getLength(const Vector2& origin, const Vector2& target) {
 	return sqrt(pow(static_cast<double>(origin.x) - static_cast<double> (target.x), 2)
 		+ pow(static_cast<double>(origin.y) - static_cast<double>(target.y), 2));
 }
 
 inline static double getWeight(const Unit& origin, const Unit& target, double Length) {
-	return static_cast<double> (target.exp) / (Length + static_cast<double> (target.time)) ;
+	return static_cast<double> (target.exp) / (Length + static_cast<double> (target.time));
 	// Reward / Time (to get the reward)
 }
 
@@ -79,8 +75,7 @@ inline static void PrintLog(const Vector2& obj) {
 	UserLog += CRLF;
 }
 
-static Unit& FindTarget();
-static void Hunt(Unit& enemy);
+static vector<UnitWeight>  FindTarget();
 static num doTest();
 
 int main() {
@@ -98,33 +93,21 @@ int main() {
 	User = Unit(tempX, tempY, doTime);
 
 	in >> uCase;
+
 	pickCount = uCase / 100;
 	if (pickCount == 0) {
 		pickCount = 1;
 	}
-	
+
 	counter = 0;
 	while (counter < uCase) {
 		in >> tempX >> tempY >> tempTime >> tempExp;
-		EnemyMap[EnemyToMap(tempX, tempY)].push_back(Unit(tempX, tempY, tempTime, tempExp));
+		EnemyMap.push_back(Unit(tempX, tempY, tempTime, tempExp));
 		counter++;
 	}
 	counter = 0;
-	
-	num Max = 0;
-	while (counter < 8) {
-		DirPriority[counter] = EnemyMap[counter].size() + EnemyMap[(counter - 1) % 8].size() + EnemyMap[(counter + 1) % 8].size();
-		if (Max < DirPriority[counter]) {
-			HighPriority = counter;
-			Max = DirPriority[counter];
-		}
-		counter++;
-	}
-	PriorityMap.reserve(Max * 3);
 
-	for_each(EnemyMap[HighPriority].begin(), EnemyMap[HighPriority].end(), VecAdd);
-	for_each(EnemyMap[(HighPriority + 1)%8].begin(), EnemyMap[(HighPriority + 1)%8].end(), VecAdd);
-	for_each(EnemyMap[(HighPriority - 1)%8].begin(), EnemyMap[(HighPriority - 1)%8].end(), VecAdd);
+	num Max = 0;
 
 	auto result = doTest();
 	out << doTime - User.time << endl << User.exp << endl;
@@ -132,50 +115,6 @@ int main() {
 	out << result << endl << UserLog;
 
 	return 0;
-}
-
-static num EnemyToMap(int X, int Y) {
-	num whichMap = 0;
-	if (static_cast<int> (User.coord.x) <= X) {
-		if (static_cast<int> (User.coord.y) <= Y) {
-			whichMap = 0;
-		}
-		else {
-			whichMap = 6;
-		}
-	}
-	else {
-		if (static_cast<int> (User.coord.y) <= Y) {
-			whichMap = 2;
-		}
-		else {
-			whichMap = 4;
-		}
-	}
-
-	switch (whichMap) {
-	case 0:
-		if (Y > X + static_cast<int> (User.coord.y) - static_cast<int> (User.coord.x)) {
-			whichMap++;
-		}
-		break;
-	case 4:
-		if (Y < X + static_cast<int> (User.coord.y) - static_cast<int> (User.coord.x)) {
-			whichMap++;
-		}
-		break;
-	case 2:
-		if (Y < (-X) + static_cast<int> (User.coord.y) + static_cast<int> (User.coord.x)) {
-			whichMap++;
-		}
-		break;
-	case 6:
-		if (Y >(-X) + static_cast<int> (User.coord.y) + static_cast<int> (User.coord.x)) {
-			whichMap++;
-		}
-		break;
-	}
-	return whichMap;
 }
 
 static void Hunt(Unit& enemy) {
@@ -186,40 +125,28 @@ static void Hunt(Unit& enemy) {
 	User.exp += enemy.exp;
 	enemy.exp = 0;
 	User.time -= enemy.time;
-	User.time -= static_cast<int> ( getLength(User.coord, enemy.coord) );
+	User.time -= static_cast<int> (getLength(User.coord, enemy.coord));
 	User.coord = enemy.coord;
 	Monsternum++;
 }
 
-static Unit& FindTarget() {
-	double minWeight = 0, tmp;
+static vector<UnitWeight> FindTarget() {
+	UnitWeight tmp;
 
-	Unit* target = nullptr;
-	for (auto itr = PriorityMap.begin(); itr != PriorityMap.end(); itr++) {
-		tmp = getWeight(User, (*itr));
-		if (minWeight < tmp) {
-			if (getLength(User.coord, (*itr).coord) + (*itr).exp < User.time) {
-				minWeight = tmp;
-				target = &(*itr);
-			}
-		}
+	vector<UnitWeight> weightEnemy;
+	for (auto itr = EnemyMap.begin(); itr != EnemyMap.end(); itr++) {
+		tmp.first = &(*itr);
+		tmp.second = getWeight(User, (*itr));
 	}
-	if (target == nullptr){
-		HuntEnd = true;
-	}
-	return *target;
+	sort(weightEnemy.begin(), weightEnemy.end(), [](UnitWeight a, UnitWeight b) {return a.second < b.second; });
+	auto itr = EnemyMap.begin() + 1;
+	return vector<UnitWeight>(itr, itr + pickCount);
 }
 
 static num doTest() {
 	bool Expand = true;
 	while (User.time > 0 && !HuntEnd) {
-		Hunt(FindTarget());
-		if (Expand) {
-			for (int i = 2; i < 7; i++) {
-				for_each(EnemyMap[(HighPriority + i) % 8].begin(), EnemyMap[(HighPriority + i) % 8].end(), VecAdd);
-			}
-			Expand = false;
-		}
+
 	}
 	return Monsternum;
 }
