@@ -9,6 +9,8 @@
 
 using namespace std;
 
+#define _LOCAL
+
 #ifdef _LOCAL
 #include<ctime>
 fstream in;
