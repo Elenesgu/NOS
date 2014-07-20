@@ -50,18 +50,19 @@ struct BitColor {
 	unsigned char R, G, B;
 	BitColor(unsigned char aR, unsigned char aG, unsigned char aB) :R(aR), G(aB), B(aB) {}
 	BitColor() : BitColor(0, 0, 0) {}
+	BitColor(const BitColor& obj) : BitColor(obj.R, obj.G, obj.B) { }
 };
 
 struct Coord2 {
 	num x, y;
 };
 
-typedef std::vector<Coord2> CoordVec;
-
 struct Node {
 	Coord2 TopLeft;
 	num Width, Height;
 	BitColor Color;
+	bool isInputted;
+	Node() : isInputted(false) {}
 };
 
 class Image {
@@ -69,16 +70,26 @@ private:
 	BitmapFileHeader fileHeader;
 	BitmapInfoHeader infoHeader;
 	std::ifstream fstream;
+	std::ofstream output;
 	std::vector< std::vector<BitColor> > Bitmap;
 
-	Coord2 MaxPoint;
-	CoordVec Nodes; //Indicate left-bottom's position
-	CoordVec Edges;
+	std::vector<Node> Nodes;
+
 public:
 	Image() : fstream() {}
-	Image(string filename, std::_Iosb<int>::_Openmode mod) { fstream.open(filename, mod); ReadFile(); }
+	Image(string filename, std::_Iosb<int>::_Openmode mod) {
+		fstream.open(filename, mod);
+		output.open("output.txt", std::ios::out);
+		ReadFile();
+#ifdef _LOCAL
+		WriteFile("output.bmp");
+#endif
+	}
 	Image(string filename) : Image(filename, std::ios::in) {}
 	void ReadFile();
+#ifdef _LOCAL
+	void WriteFile(string filename);
+#endif
 };
 
 int main() {
@@ -125,10 +136,28 @@ void Image::ReadFile() {
 	}
 	BitColor tmp;
 	Bitmap = std::vector<std::vector<BitColor> >(height, std::vector<BitColor>(width, BitColor(255, 255, 255)));
-	for (int y = height - 1; y >= 0; y--){
+	for (int y = height - 1; y >= 0; y--) {
 		for (int x = 0; x < width; x++){
 			fstream >> tmp.B >> tmp.G >> tmp.R;
 			Bitmap[y][x] = tmp;
 		}
+		tmp;
 	}
 }
+
+#ifdef _LOCAL
+void Image::WriteFile(string filename) {
+	std::ofstream output(filename, std::ios::out);
+
+	output.write(reinterpret_cast<char*>(&fileHeader), sizeof fileHeader);
+	output.write(reinterpret_cast<char*>(&infoHeader), sizeof infoHeader);
+
+	BitColor tmp;
+	for (int y = infoHeader.biHeight - 1; y >= 0; y--) {
+		for (int x = 0; x < infoHeader.biWidth; x++) {
+			tmp = Bitmap[y][x];
+			output << tmp.B << tmp.G << tmp.R;
+		}	
+	}
+}
+#endif
