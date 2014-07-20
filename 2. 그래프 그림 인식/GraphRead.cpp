@@ -1,10 +1,10 @@
 #include <iostream>
-#include <cstdio>
 #include <vector>
 #include <string>
-#include<algorithm>
-#include<fstream>
-#include<ios>
+#include <algorithm>
+#include <fstream>
+#include <ios>
+#include <queue>
 
 using std::string;
 using std::endl;
@@ -51,18 +51,45 @@ struct BitColor {
 	BitColor(unsigned char aR, unsigned char aG, unsigned char aB) :R(aR), G(aB), B(aB) {}
 	BitColor() : BitColor(0, 0, 0) {}
 	BitColor(const BitColor& obj) : BitColor(obj.R, obj.G, obj.B) { }
+	
+	bool operator ==(const BitColor& obj) const{
+		return (R == obj.R) && (G == obj.G) && (B == obj.B);
+	}
+	bool operator !=(const BitColor& obj) const {
+		return !(obj == *this);
+	}
 };
 
 struct Coord2 {
-	num x, y;
+	int x, y;
+	Coord2(int ax, int ay) : x(ax), y(ay){}
+	Coord2(const Coord2& obj) :Coord2(obj.x, obj.y){}
+	Coord2():Coord2(0, 0) {}
+
+	bool operator ==(const Coord2& obj) const{
+		return (x == obj.x) && (y == obj.y);
+	}
+	bool operator !=(const Coord2& obj) const {
+		return !(obj == *this);
+	}
 };
 
 struct Node {
 	Coord2 TopLeft;
 	num Width, Height;
 	BitColor Color;
-	bool isInputted;
-	Node() : isInputted(false) {}
+	num order;
+	Node(int x, int y, num w, num h, BitColor bc) :TopLeft(x, y), Width(w), Height(h), Color(bc) {}
+	Node(Coord2 cord, num w, num h, BitColor bc) :TopLeft(cord), Width(w), Height(h), Color(bc) {}
+	Node() :TopLeft(-1, -1) {} //Null reference
+};
+
+struct Edge{
+	Node* First, Second;
+};
+
+struct tmpEdge {
+	Coord2 Fisrt, Second;
 };
 
 class Image {
@@ -71,9 +98,17 @@ private:
 	BitmapInfoHeader infoHeader;
 	std::ifstream fstream;
 	std::ofstream output;
+	int width, height;
+
 	std::vector< std::vector<BitColor> > Bitmap;
+	std::vector< std::vector<bool> > Visited;
+
+	static BitColor WhiteBit;
+	static BitColor BlackBit;
 
 	std::vector<Node> Nodes;
+	std::vector<Edge> Edges;
+	std::vector<tmpEdge> tmpEdges;
 
 public:
 	Image() : fstream() {}
@@ -81,16 +116,24 @@ public:
 		fstream.open(filename, mod);
 		output.open("output.txt", std::ios::out);
 		ReadFile();
+		Search();
 #ifdef _LOCAL
 		WriteFile("output.bmp");
 #endif
+
 	}
 	Image(string filename) : Image(filename, std::ios::in) {}
 	void ReadFile();
+	void Search();
+	Node FindNode(Coord2 tl);
+	Edge FindEdge(Coord2 tl);
 #ifdef _LOCAL
 	void WriteFile(string filename);
 #endif
 };
+
+BitColor Image::WhiteBit = BitColor(255, 255, 255);
+BitColor Image::BlackBit = BitColor(0, 0, 0);
 
 int main() {
 	Image Data("input.bmp");
@@ -110,8 +153,8 @@ void Image::ReadFile() {
 
 	fstream.read(reinterpret_cast<char*>(&infoHeader), sizeof infoHeader);
 
-	const int width = infoHeader.biWidth;
-	const int height = infoHeader.biHeight;
+	width = infoHeader.biWidth;
+	height = infoHeader.biHeight;
 	const int bitsPerPixel = infoHeader.biBitCount;
 	const int bytesPerPixel = bitsPerPixel / 8;
 	const int pitch = (width * bytesPerPixel + 3) & ~3;
@@ -136,13 +179,115 @@ void Image::ReadFile() {
 	}
 	BitColor tmp;
 	Bitmap = std::vector<std::vector<BitColor> >(height, std::vector<BitColor>(width, BitColor(255, 255, 255)));
+	Visited = std::vector<std::vector<bool> >(height, std::vector<bool>(width, false));
 	for (int y = height - 1; y >= 0; y--) {
 		for (int x = 0; x < width; x++){
 			fstream >> tmp.B >> tmp.G >> tmp.R;
 			Bitmap[y][x] = tmp;
 		}
-		tmp;
 	}
+}
+
+void Image::Search() {
+	for (int y = 0; y < height; y++){
+		for (int x = 0; x < width; x++) {
+			if (Bitmap[y][x] == WhiteBit) {
+				Visited[y][x] = true;
+			}
+			else {
+				if (Bitmap[y][x] == BlackBit){
+					//Edge
+
+				}
+				else {
+					//Node
+					Node tmpnode = FindNode(Coord2(x, y));
+					if (tmpnode.TopLeft != Coord2(-1, -1)){
+						Nodes.push_back(tmpnode);
+					}					
+				}
+			}
+		}
+	}
+}
+
+Node Image::FindNode(Coord2 tl) {
+	BitColor nColor = Bitmap[tl.y][tl.x];
+	int initx = tl.x, inity = tl.y;
+	for (; initx < width; initx++) {		
+		if (Bitmap[inity][initx] != nColor) {
+			initx;
+			break;
+		}
+	}
+	for (; inity < height; inity++){
+		if (Bitmap[inity][initx] != nColor){
+			inity;
+			break;
+		}
+	}
+	int nwidth, nheight;
+	nwidth = initx - tl.x;
+	nheight = inity - tl.y;
+	if (nwidth == 1 || nheight == 1){
+		Visited[inity][initx] = true;
+		return Node();
+	}
+	else{
+		for (int i = 0; i < nheight; i++){
+			for (int j = 0; j < nwidth; j++){
+				Visited[tl.y + i][tl.x + j] = true;
+			}
+		}
+		return Node(tl, nwidth, nheight, nColor);
+	}
+}
+
+tmpEdge Image::FindEdge(Coord2 tl) {
+	std::queue<Coord2> BFSqueue;
+	BFSqueue.push(tl);
+	std::vector<Coord2> earth;
+	Coord2 Curcoord;
+	while (BFSqueue.empty()){
+		Curcoord = BFSqueue.front();
+		BFSqueue.pop();
+		if (Bitmap[Curcoord.y][Curcoord.x + 1] != WhiteBit) {
+			if (Bitmap[Curcoord.y][Curcoord.x + 1] == BlackBit) {
+				BFSqueue.push(Coord2(Curcoord.x + 1, Curcoord.y));
+			}
+			else {
+				earth.push_back(Coord2(Curcoord.x + 1, Curcoord.y));
+			}
+		}
+		if (Bitmap[Curcoord.y][Curcoord.x - 1] != WhiteBit) {
+			if (Bitmap[Curcoord.y][Curcoord.x - 1] == BlackBit) {
+				BFSqueue.push(Coord2(Curcoord.x - 1, Curcoord.y));
+			}
+			else {
+				earth.push_back(Coord2(Curcoord.x - 1, Curcoord.y));
+			}
+		}
+		if (Bitmap[Curcoord.y + 1][Curcoord.x] != WhiteBit) {
+			if (Bitmap[Curcoord.y + 1][Curcoord.x] == BlackBit) {
+				BFSqueue.push(Coord2(Curcoord.x, Curcoord.y + 1));
+			}
+			else {
+				earth.push_back(Coord2(Curcoord.x, Curcoord.y + 1));
+			}
+		}
+		if (Bitmap[Curcoord.y - 1][Curcoord.x] != WhiteBit) {
+			if (Bitmap[Curcoord.y - 1][Curcoord.x] == BlackBit) {
+				BFSqueue.push(Coord2(Curcoord.x, Curcoord.y - 1));
+			}
+			else {
+				earth.push_back(Coord2(Curcoord.x, Curcoord.y - 1));
+			}
+		}
+	}
+	if (earth.size() != 2){
+		out << "Invalid Edge Detected" << endl;
+	}
+
 }
 
 #ifdef _LOCAL
