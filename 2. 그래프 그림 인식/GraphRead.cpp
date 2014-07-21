@@ -89,7 +89,9 @@ struct Edge{
 };
 
 struct tmpEdge {
-	Coord2 Fisrt, Second;
+	Coord2 First, Second;
+	tmpEdge(Coord2 aFirst,Coord2 aSecond) : First(aFirst), Second(aSecond) { }
+	tmpEdge() : tmpEdge(Coord2(-1, -1), Coord2(-1, -1)) {}
 };
 
 class Image {
@@ -126,10 +128,16 @@ public:
 	void ReadFile();
 	void Search();
 	Node FindNode(Coord2 tl);
-	Edge FindEdge(Coord2 tl);
+	tmpEdge FindEdge(Coord2 tl);
 #ifdef _LOCAL
 	void WriteFile(string filename);
 #endif
+	~Image() {
+		fstream.close();
+#ifdef _LOCAL
+		output.close();
+#endif
+	}
 };
 
 BitColor Image::WhiteBit = BitColor(255, 255, 255);
@@ -287,7 +295,7 @@ tmpEdge Image::FindEdge(Coord2 tl) {
 	if (earth.size() != 2){
 		out << "Invalid Edge Detected" << endl;
 	}
-
+	return tmpEdge(earth[0], earth[1]);
 }
 
 #ifdef _LOCAL
