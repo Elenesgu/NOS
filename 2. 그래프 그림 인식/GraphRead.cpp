@@ -18,9 +18,9 @@ using std::endl;
 std::ostream& out = std::cout;
 std::chrono::time_point<std::chrono::system_clock> tstart, tend;
 auto NowTime = std::chrono::system_clock::now;
-#elif
+#else
 #include<fstream>
-std::ofstream& out = std::out;
+std::ofstream out("output.txt");
 #endif
 
 typedef unsigned int num;
@@ -117,26 +117,25 @@ private:
 	std::ofstream output;
 	int width, height;
 
-	std::vector< std::vector<BitColor> > Bitmap;
+	//std::vector< std::vector<BitColor> > Bitmap;
+	BitColor** Bitmap;
 	std::vector< std::vector<bool> > Visited;
 
 	static BitColor WhiteBit;
 	static BitColor BlackBit;
-
 	std::vector<Node> Nodes;
 	std::vector<Edge> Edges;
 	std::vector<tmpEdge> tmpEdges;
-
 public:
 	Image() : fstream() {}
 	Image(string filename, string mod) {
-		fstream = fopen(filename.c_str(), mod.c_str());
-		output.open("output.txt", std::ios::out);
+		fopen_s(&fstream, filename.c_str(), mod.c_str());
 		ReadFile();
 		Search();
 		MakeEdge();
 		PrintResult();
-#ifdef _LOCAL
+#ifdef _W_FILE
+		output.open("output.txt", std::ios::out);
 		WriteFile("output.bmp");
 #endif
 
@@ -148,12 +147,20 @@ public:
 	void PrintResult();
 	Node FindNode(Coord2 tl);
 	tmpEdge FindEdge(Coord2 tl);
-#ifdef _LOCAL
+#ifdef _W_FILE
 	void WriteFile(string filename);
 #endif
 	~Image() {
 		fclose(fstream);
+		for (int i = 0; i < height; i++){
+			free(Bitmap[i]);
+		}
+		free(Bitmap);
 #ifdef _LOCAL
+		int a;
+		std::cin >> a;
+#endif
+#ifdef _W_FILE
 		output.close();
 #endif
 	}
@@ -164,28 +171,30 @@ BitColor Image::BlackBit = BitColor(0, 0, 0);
 
 int main() {
 	string IfileName;
+
 #ifdef _LOCAL
+	
 	out << "Input File Name(not include .bmp): ";
 	std::cin >> IfileName;
 	IfileName += ".bmp";
 	tstart = NowTime();
 #else
-	IfileNmae = "input.bmp";
+	IfileName = "input.bmp";
 #endif
 
 	Image Data(IfileName);
 
 #ifdef _LOCAL
 	tend = NowTime();
-	out << "Total Operating time: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << endl;
+	out << "Total Operating time: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
 #endif
 	return 0;
 }
 
 void Image::ReadFile() {
 	if (!fstream){
-		out << "fpointer null" << endl;
-		return;
+		out << "File not found" << endl;
+		exit(-1);
 	}
 	fread(reinterpret_cast<char*>(&fileHeader), sizeof fileHeader, 1, fstream);
 	if (fileHeader.bfType != ('B' | (static_cast<int>('M') << 8))) {
@@ -220,30 +229,26 @@ void Image::ReadFile() {
 		return;
 	}
 	BitColor tmp;
-	Bitmap.reserve(height);
-	Bitmap = std::vector<std::vector<BitColor> >(height, std::vector<BitColor>(width, BitColor(255, 255, 255)));
+	Bitmap = (BitColor**) malloc(sizeof(BitColor*) * height);
 	Visited = std::vector<std::vector<bool> >(height, std::vector<bool>(width, false));
 
 #ifdef _LOCAL
 	tend = NowTime();
-	out << "Allocation End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << endl;
+	out << "Allocation End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
 #endif
 	for (int y = height - 1; y >= 0; y--) {
-		for (int x = 0; x < width; x++){
-			fread(reinterpret_cast<char*>(&tmp), sizeof tmp,1, fstream);
-			Bitmap[y][x] = tmp;
-		}
-		
+		Bitmap[y] = (BitColor*)malloc(sizeof(BitColor)* width);
+			fread(reinterpret_cast<char *>(Bitmap[y]), sizeof(BitColor)* width, 1, fstream);
 	}
 #ifdef _LOCAL
 	tend = NowTime();
-	out << "File Read End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << endl;
+	out << "File Read End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
 #endif
 }
 
 void Image::Search() {
 	int Nodeindex = 0;
-	for (int y = 0; y < height; y++){
+	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
 			if (Visited[y][x] == false) {
 				if (Bitmap[y][x] == WhiteBit) {
@@ -274,7 +279,7 @@ void Image::Search() {
 void Image::MakeEdge() {
 #ifdef _LOCAL
 	tend = NowTime();
-	out << "Search End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << endl;
+	out << "Search End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
 #endif
 	tmpEdge origin; 
 	Edge target;
@@ -300,10 +305,7 @@ void Image::MakeEdge() {
 			}
 		}
 		if (target.First > target.Second) {
-			int st;
-			st = target.First;
-			target.First = target.Second;
-			target.Second = st;
+			std::swap(target.First, target.Second);
 		}
 		Edges.push_back(target);
 	}
@@ -327,8 +329,9 @@ void Image::PrintResult() {
 
 Node Image::FindNode(Coord2 tl) {
 #ifdef _LOCAL
+	static int countnum = 1;
 	tend = NowTime();
-	out << "Node Found: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "at " << tl.x << "," << tl.y << endl;
+	out << countnum++ << ")Node Found: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << " at " << tl.x << ", " << tl.y << endl;
 #endif
 	BitColor nColor = Bitmap[tl.y][tl.x];
 	int initx = tl.x, inity = tl.y;
@@ -361,8 +364,9 @@ Node Image::FindNode(Coord2 tl) {
 
 tmpEdge Image::FindEdge(Coord2 tl) {
 #ifdef _LOCAL
+	static int countnum = 1;
 	tend = NowTime();
-	out << "tmpEdge Found: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "at " << tl.x << "," << tl.y << endl;
+	out << countnum++ << ")tmpEdge Found: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << " at " << tl.x << ", " << tl.y << endl;
 #endif
 	std::queue<Coord2> BFSqueue;
 	Visited[tl.y][tl.x] = true;
@@ -370,6 +374,7 @@ tmpEdge Image::FindEdge(Coord2 tl) {
 	std::vector<Coord2> earth;
 	Coord2 Curcoord;
 	while (!BFSqueue.empty()){
+		
 		Curcoord = BFSqueue.front();
 		BFSqueue.pop();
 		if (Bitmap[Curcoord.y][Curcoord.x + 1] != WhiteBit) {
@@ -384,6 +389,9 @@ tmpEdge Image::FindEdge(Coord2 tl) {
 			}
 
 		}
+		else {
+			Visited[Curcoord.y][Curcoord.x + 1] = true;
+		}
 		if (Bitmap[Curcoord.y][Curcoord.x - 1] != WhiteBit) {
 			if (Bitmap[Curcoord.y][Curcoord.x - 1] == BlackBit) {
 				if (!Visited[Curcoord.y][Curcoord.x - 1]){
@@ -395,6 +403,9 @@ tmpEdge Image::FindEdge(Coord2 tl) {
 				earth.push_back(Coord2(Curcoord.x - 1, Curcoord.y));
 			}
 
+		}
+		else {
+			Visited[Curcoord.y][Curcoord.x - 1] = true;
 		}
 		if (Bitmap[Curcoord.y + 1][Curcoord.x] != WhiteBit) {
 			if (Bitmap[Curcoord.y + 1][Curcoord.x] == BlackBit) {
@@ -408,9 +419,12 @@ tmpEdge Image::FindEdge(Coord2 tl) {
 			}
 
 		}
+		else {
+			Visited[Curcoord.y + 1][Curcoord.x] = true;
+		}
 		if (Bitmap[Curcoord.y - 1][Curcoord.x] != WhiteBit) {
 			if (Bitmap[Curcoord.y - 1][Curcoord.x] == BlackBit) {
-				if (!Visited[Curcoord.y + 1][Curcoord.x]) {
+				if (!Visited[Curcoord.y - 1][Curcoord.x]) {
 					Visited[Curcoord.y - 1][Curcoord.x] = true;
 					BFSqueue.push(Coord2(Curcoord.x, Curcoord.y - 1));
 				}
@@ -419,17 +433,26 @@ tmpEdge Image::FindEdge(Coord2 tl) {
 				earth.push_back(Coord2(Curcoord.x, Curcoord.y - 1));	
 			}
 		}
+		else {
+			Visited[Curcoord.y - 1][Curcoord.x] = true;
+		}
 	}
 	if (earth.size() < 2){
 		return tmpEdge(Coord2(-1, -1), Coord2(-1, -1));
 	}
-	std::sort(earth.begin(), earth.end(), [](const Coord2& a, const Coord2& b){
-		return (a.x * 8000 + a. y> b.x *8000+ b.y);
-	});
-	return tmpEdge(earth.front(), earth.back());
+	Coord2 cFirst = earth.front();
+	Coord2 cSecond;
+	for (size_t i = 0; i < earth.size(); i++) {
+		if (Bitmap[cFirst.y][cFirst.x] != Bitmap[earth[i].y][earth[i].x]) {
+			cSecond = earth[i];
+			break;
+		}
+	}
+	return tmpEdge(cFirst, cSecond);
 }
 
-#ifdef _LOCAL
+//Not tested
+#ifdef _W_FILE
 void Image::WriteFile(string filename) {
 	std::ofstream output(filename, std::ios::out);
 
@@ -437,11 +460,12 @@ void Image::WriteFile(string filename) {
 	output.write(reinterpret_cast<char*>(&infoHeader), sizeof infoHeader);
 
 	BitColor tmp;
-	for (int y = infoHeader.biHeight - 1; y >= 0; y--) {
-		for (int x = 0; x < infoHeader.biWidth; x++) {
-			tmp = Bitmap[y][x];
-			output << tmp.B << tmp.G << tmp.R;
-		}	
+	for (int y = height - 1; y >= 0; y--) {
+		output.write(reinterpret_cast<char*> (&Bitmap[y]), sizeof(BitColor) * width);
 	}
+#ifdef _LOCAL
+	tend = NowTime();
+	out << "OutputFile Created: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
+#endif
 }
 #endif
