@@ -231,6 +231,8 @@ void Image::ReadFile() {
 	BitColor tmp;
 	Bitmap = (BitColor**) malloc(sizeof(BitColor*) * height);
 	Visited = std::vector<std::vector<bool> >(height, std::vector<bool>(width, false));
+	int trash;
+	const int padding = width % 4;
 
 #ifdef _LOCAL
 	tend = NowTime();
@@ -238,7 +240,9 @@ void Image::ReadFile() {
 #endif
 	for (int y = height - 1; y >= 0; y--) {
 		Bitmap[y] = (BitColor*)malloc(sizeof(BitColor)* width);
-			fread(reinterpret_cast<char *>(Bitmap[y]), sizeof(BitColor)* width, 1, fstream);
+		fread(reinterpret_cast<char *>(Bitmap[y]), sizeof(BitColor)* width, 1, fstream);
+		fread(reinterpret_cast<char *>(&trash), sizeof(char) * padding, 1, fstream);
+
 	}
 #ifdef _LOCAL
 	tend = NowTime();
