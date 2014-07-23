@@ -10,8 +10,6 @@
 using std::string;
 using std::endl;
 
-#define _LOCAL
-
 #ifdef _LOCAL
 #include<chrono>
 #include<ctime>
@@ -104,9 +102,9 @@ struct Edge{
 };
 
 struct tmpEdge {
-	Coord2 First, Second;
-	tmpEdge(Coord2 aFirst,Coord2 aSecond) : First(aFirst), Second(aSecond) { }
-	tmpEdge() : tmpEdge(Coord2(-1, -1), Coord2(-1, -1)) {}
+	std::vector<Coord2> Earth;
+	tmpEdge() : Earth(1, Coord2(-1, -1)) {}
+	tmpEdge(const std::vector<Coord2> obj) : Earth(obj.begin(), obj.end()) {}
 };
 
 class Image {
@@ -262,7 +260,7 @@ void Image::Search() {
 					if (Bitmap[y][x] == BlackBit){
 						//Edge
 						tmpEdge tedge = FindEdge(Coord2(x, y));
-						if (tedge.First != Coord2(-1, -1) && tedge.Second != Coord2(-1, -1)) {
+						if (tedge.Earth[0] != Coord2(-1, -1)) {
 							tmpEdges.push_back(tedge);
 						}
 					}
@@ -290,7 +288,7 @@ void Image::MakeEdge() {
 	Coord2 BaseCoord;
 	for (size_t i = 0; i < tmpEdges.size(); i++)  {
 		origin = tmpEdges[i];
-		BaseCoord = origin.First;
+		BaseCoord = origin.Earth[0];
 		for (size_t index = 0; index < Nodes.size(); index++) {
 			if ((Nodes[index].TopLeft.x <= BaseCoord.x) && (Nodes[index].TopLeft.x + static_cast<int>(Nodes[index].Width) >= BaseCoord.x)
 				&& (Nodes[index].TopLeft.y <= BaseCoord.y) && (Nodes[index].TopLeft.y + static_cast<int>(Nodes[index].Height) >= BaseCoord.y)) {
@@ -299,12 +297,19 @@ void Image::MakeEdge() {
 				break;
 			}
 		}
-		BaseCoord = origin.Second;
-		for (size_t index = 0; index < Nodes.size(); index++) {
-			if ((Nodes[index].TopLeft.x <= BaseCoord.x) && (Nodes[index].TopLeft.x + static_cast<int>(Nodes[index].Width) >= BaseCoord.x)
-				&& (Nodes[index].TopLeft.y <= BaseCoord.y) && (Nodes[index].TopLeft.y + static_cast<int>(Nodes[index].Height) >= BaseCoord.y)) {
+		for (size_t j = 1; j < origin.Earth.size(); j++) {			
+			BaseCoord = origin.Earth[j];
+			int tmporder;
+			for (size_t index = 0; index < Nodes.size(); index++) {
+				if ((Nodes[index].TopLeft.x <= BaseCoord.x) && (Nodes[index].TopLeft.x + static_cast<int>(Nodes[index].Width) >= BaseCoord.x)
+					&& (Nodes[index].TopLeft.y <= BaseCoord.y) && (Nodes[index].TopLeft.y + static_cast<int>(Nodes[index].Height) >= BaseCoord.y)) {
 
-				target.Second = Nodes[index].order;
+					tmporder = Nodes[index].order;
+					break;
+				}
+			}
+			if (tmporder != target.First) {
+				target.Second = tmporder;
 				break;
 			}
 		}
@@ -312,6 +317,7 @@ void Image::MakeEdge() {
 			std::swap(target.First, target.Second);
 		}
 		Edges.push_back(target);
+		
 	}
 }
 
@@ -442,17 +448,21 @@ tmpEdge Image::FindEdge(Coord2 tl) {
 		}
 	}
 	if (earth.size() < 2){
-		return tmpEdge(Coord2(-1, -1), Coord2(-1, -1));
+		return tmpEdge();
 	}
 	Coord2 cFirst = earth.front();
 	Coord2 cSecond;
-	for (size_t i = 0; i < earth.size(); i++) {
-		if (Bitmap[cFirst.y][cFirst.x] != Bitmap[earth[i].y][earth[i].x]) {
+	double maxDistance = 0;
+	double tmpDistance;
+	for (size_t i = 1; i < earth.size(); i++) {
+		tmpDistance = pow(static_cast<double> (std::abs(cFirst.x - cSecond.x)), 2) + pow(static_cast<double>(abs(cFirst.y - cSecond.y)), 2);
+		if (maxDistance < tmpDistance) {
+			maxDistance = tmpDistance;
 			cSecond = earth[i];
-			break;
 		}
 	}
-	return tmpEdge(cFirst, cSecond);
+	
+	return tmpEdge(earth);
 }
 
 //Not tested
