@@ -16,7 +16,7 @@ std::ofstream out("output.txt");
 #endif
 
 
-
+typedef unsigned char byte;
 typedef unsigned int num;
 
 #pragma pack(push, 1)
@@ -43,18 +43,11 @@ struct BitmapInfoHeader {
 	unsigned int    biClrImportant;
 };
 
-struct BitColor {
-	unsigned char B, G, R;
-	BitColor(unsigned char aG, unsigned char aB, unsigned char aR) :G(aG), B(aB), R(aR) {}
-	BitColor() : BitColor(0, 0, 0) {}
-	BitColor(const BitColor& obj) : BitColor(obj.G, obj.B, obj.R) { }
-
-	bool operator ==(const BitColor& obj) const{
-		return (R == obj.R) && (G == obj.G) && (B == obj.B);
-	}
-	bool operator !=(const BitColor& obj) const {
-		return !(obj == *this);
-	}
+struct BitPallet {
+	unsigned char B;
+	unsigned char G;
+	unsigned char R;
+	unsigned char Reserved;
 };
 
 #pragma pack(pop)
@@ -81,11 +74,9 @@ private:
 	FILE* fstream;
 	std::ofstream output;
 	int width, height;
+	BitPallet Pallet[256];
 
-	BitColor** Bitmap;
-
-	static BitColor WhiteBit;
-	static BitColor BlackBit;
+	byte** Bitmap;
 public:
 	Image() : fstream() {}
 	Image(string filename, string mod) {
@@ -155,39 +146,39 @@ void Image::ReadFile() {
 	const int bytesPerPixel = bitsPerPixel / 8;
 	const int pitch = (width * bytesPerPixel + 3) & ~3;
 	const int dataSize = pitch * height;
+	int padding;
 
-	if (width > 8192 || width <= 0 ||
-		height > 8192 || height <= 0 ||
-		infoHeader.biPlanes != 1 ||
-		bitsPerPixel != 24 ||
+	if (	infoHeader.biPlanes != 1 ||
 		infoHeader.biCompression != 0 ||
 		static_cast<int>(infoHeader.biSizeImage) != dataSize
 		) {
 		out << "Unsupported Format" << endl;
-		out << "Width: " << width << ", Height: " << height << endl;
 		return;
 	}
+
+	fread(reinterpret_cast<char*>(Pallet), sizeof(Pallet)* 256, 1, fstream);
+
 	const int dataBeginPos = static_cast<int> (ftell(fstream));
+
 	if (dataBeginPos != static_cast<int>(fileHeader.bfOffBits))
 	{
-		out << "Unsupported Format" << endl;
+		out << "Header has not read completely" << endl;
 		return;
 	}
-	BitColor tmp;
-	Bitmap = (BitColor**)malloc(sizeof(BitColor*)* height);
-	int trash;
-	const int padding = width % 4;
+
+	Bitmap = (byte**)malloc(sizeof(byte*)* height);
 
 #ifdef _LOCAL
 	tend = NowTime();
-	out << "Allocation End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
+	out << "Allocation and Head Reading End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
 #endif
-	for (int y = height - 1; y >= 0; y--) {
-		Bitmap[y] = (BitColor*)malloc(sizeof(BitColor)* width);
-		fread(reinterpret_cast<char *>(Bitmap[y]), sizeof(BitColor)* width, 1, fstream);
-		fread(reinterpret_cast<char *>(&trash), sizeof(char)* padding, 1, fstream);
 
+	for (int y = height - 1; y >= 0; y--) {
+		Bitmap[y] = (byte*)malloc(sizeof(byte)* width);
+		fread(reinterpret_cast<char*>(Bitmap[y]), sizeof(byte)* width, 1, fstream);
+		fread(reinterpret_cast<char*>(&padding), sizeof(byte)* pitch, 1, fstream);
 	}
+	
 #ifdef _LOCAL
 	tend = NowTime();
 	out << "File Read End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
