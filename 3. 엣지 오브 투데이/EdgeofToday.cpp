@@ -1,8 +1,12 @@
 #include<iostream>
 #include<string>
+#include<vector>
+
 
 using std::endl;
 using std::string;
+
+#define _LOCAL
 
 #ifdef _LOCAL
 #include<chrono>
@@ -67,37 +71,62 @@ struct Coord2 {
 	}
 };
 
+struct Unit {
+	Coord2 coord;
+	float energy;
+	Unit(Coord2 ac, float ae): coord(ac), energy(ae) {}
+	Unit(int ax, int ay, float ae): coord(ax, ay), energy(ae) {}
+	Unit(int ax, int ay) : Unit(ax, ay, 0) {}
+	Unit(Coord2 ac) : Unit(ac, 0) {}
+	Unit() : Unit(-1, -1){}
+};
+
 class Image {
 private:
 	BitmapFileHeader fileHeader;
 	BitmapInfoHeader infoHeader;
-	FILE* fstream;
-	std::ofstream output;
+	FILE* pImageFile;
+	FILE* pTextFile;
 	int width, height;
 	BitPallet Pallet[256];
 
 	byte** Bitmap;
+
+	std::vector<Unit> UFO;
+	std::vector<Unit> Bunker;
+
+	byte BlackBit;
 public:
-	Image() : fstream() {}
-	Image(string filename, string mod) {
-		fopen_s(&fstream, filename.c_str(), mod.c_str());
-		ReadFile();
+	Image() : pImageFile() {}
+	Image(string imagename, string imod, string txtname, string txtmod) {
+		fopen_s(&pImageFile, imagename.c_str(), imod.c_str());
+		fopen_s(&pTextFile, txtname.c_str(), txtmod.c_str());
+		ReadImage();
+		ReadText();
 #ifdef _W_FILE
 		output.open("output.txt", std::ios::out);
 		WriteFile("output.bmp");
 #endif
 
 	}
-	Image(string filename) : Image(filename, "rb") {}
-	void ReadFile();
+	Image(string Iname, string Tname) : Image(Iname, "rb", Tname, "rb") {}
+	void ReadImage();
+	void ReadText();
 #ifdef _W_FILE
 	void WriteFile(string filename);
 #endif
 	~Image() {
-		fclose(fstream);
+		fclose(pImageFile);
+		fclose(pTextFile);
+		for (int i = 0; i < height; i++){
+			free(Bitmap[i]);
+		}
+		free(Bitmap);
 #ifdef _LOCAL
+		/*
 		int a;
 		std::cin >> a;
+		*/
 #endif
 #ifdef _W_FILE
 		output.close();
@@ -106,19 +135,26 @@ public:
 };
 
 int main() {
-	string IfileName;
+	string IimageName, Itxtname;
 
 #ifdef _LOCAL
-
-	out << "Input File Name(not include .bmp): ";
-	std::cin >> IfileName;
-	IfileName += ".bmp";
 	tstart = NowTime();
+	/*
+	out << "Input World File Name(not include .bmp): ";
+	std::cin >> IimageName;
+	IimageName += ".bmp";
+	out << "Input Text File Name(not include .txt): ";
+	std::cin >> Itxtname;
+	Itxtname += ".txt";
+	*/
+	IimageName = "world.bmp";
+	Itxtname = "input.txt";
 #else
-	IfileName = "input.bmp";
+	IimageName = "world.bmp";
+	Itxtname = "input.txt";
 #endif
 
-	Image Data(IfileName);
+	Image Data(IimageName, Itxtname);
 
 #ifdef _LOCAL
 	tend = NowTime();
@@ -127,43 +163,48 @@ int main() {
 	return 0;
 }
 
-void Image::ReadFile() {
-	if (!fstream){
+void Image::ReadImage() {
+	if (!pImageFile){
 		out << "File not found" << endl;
 		exit(-1);
 	}
-	fread(reinterpret_cast<char*>(&fileHeader), sizeof fileHeader, 1, fstream);
+	fread(reinterpret_cast<char*>(&fileHeader), sizeof fileHeader, 1, pImageFile);
 	if (fileHeader.bfType != ('B' | (static_cast<int>('M') << 8))) {
 		out << "File is not a bitmap" << endl;
 		return;
 	}
-
-	fread(reinterpret_cast<char*>(&infoHeader), sizeof infoHeader, 1, fstream);
+	fread(reinterpret_cast<char*>(&infoHeader), sizeof infoHeader, 1, pImageFile);
 
 	width = infoHeader.biWidth;
 	height = infoHeader.biHeight;
 	const int bitsPerPixel = infoHeader.biBitCount;
 	const int bytesPerPixel = bitsPerPixel / 8;
-	const int pitch = (width * bytesPerPixel + 3) & ~3;
+	const int pitch = (width * bytesPerPixel + 3) % 4;
 	const int dataSize = pitch * height;
 	int padding;
 
 	if (	infoHeader.biPlanes != 1 ||
-		infoHeader.biCompression != 0 ||
-		static_cast<int>(infoHeader.biSizeImage) != dataSize
+		infoHeader.biCompression != 0
 		) {
 		out << "Unsupported Format" << endl;
 		return;
 	}
 
-	fread(reinterpret_cast<char*>(Pallet), sizeof(Pallet)* 256, 1, fstream);
+	fread(reinterpret_cast<char*>(Pallet), sizeof(BitPallet)* 256, 1, pImageFile);
 
-	const int dataBeginPos = static_cast<int> (ftell(fstream));
+	const int dataBeginPos = static_cast<int> (ftell(pImageFile));
 
 	if (dataBeginPos != static_cast<int>(fileHeader.bfOffBits))
 	{
 		out << "Header has not read completely" << endl;
 		return;
+	}
+
+	for (int i = 0; i < 256; i++) {
+		if (Pallet[i].B == 0 && Pallet[i].G == 0 && Pallet[i].R == 0) {
+			BlackBit = i;
+			break;
+		}
 	}
 
 	Bitmap = (byte**)malloc(sizeof(byte*)* height);
@@ -175,12 +216,44 @@ void Image::ReadFile() {
 
 	for (int y = height - 1; y >= 0; y--) {
 		Bitmap[y] = (byte*)malloc(sizeof(byte)* width);
-		fread(reinterpret_cast<char*>(Bitmap[y]), sizeof(byte)* width, 1, fstream);
-		fread(reinterpret_cast<char*>(&padding), sizeof(byte)* pitch, 1, fstream);
+		fread(reinterpret_cast<char*>(Bitmap[y]), sizeof(byte)* width, 1, pImageFile);
+		fread(reinterpret_cast<char*>(&padding), sizeof(byte)* pitch, 1, pImageFile);
 	}
 	
 #ifdef _LOCAL
 	tend = NowTime();
-	out << "File Read End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
+	out << "Image File Read End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
+#endif
+}
+
+void Image::ReadText() {
+	if (!pTextFile){
+		out << "Text File not found" << endl;
+		exit(-1);
+	}
+	num uCase, bCase;
+	num x, y;
+	float energy;
+	fscanf_s(pTextFile, "%d", &uCase);
+	UFO.reserve(uCase);
+	while (uCase--) {
+		fscanf_s(pTextFile, "%d", &x);
+		fscanf_s(pTextFile, "%d", &y);
+		fscanf_s(pTextFile, "%g", &energy);
+		UFO.push_back(Unit(x, y, energy));
+	}
+
+	fscanf_s(pTextFile, "%d", &bCase);
+
+	Bunker.reserve(bCase);
+	while (bCase--) {
+		fscanf_s(pTextFile, "%d", &x);
+		fscanf_s(pTextFile, "%d", &y);	
+		Bunker.push_back(Unit(x, y));
+	}
+
+#ifdef _LOCAL
+	tend = NowTime();
+	out << "Text File Read End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
 #endif
 }
