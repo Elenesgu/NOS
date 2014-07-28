@@ -11,6 +11,7 @@ using std::string;
 #ifdef _LOCAL
 #include<chrono>
 #include<ctime>
+#include<fstream>
 std::ostream& out = std::cout;
 std::chrono::time_point<std::chrono::system_clock> tstart, tend;
 auto NowTime = std::chrono::system_clock::now;
@@ -87,11 +88,14 @@ private:
 	BitmapInfoHeader infoHeader;
 	FILE* pImageFile;
 	FILE* pTextFile;
+	
 	int width, height;
 	BitPallet Pallet[256];
 
 	byte** Bitmap;
+	std::vector< std::vector< byte> > vBitmap;
 
+	int* Land;
 	std::vector<Unit> UFO;
 	std::vector<Unit> Bunker;
 
@@ -103,18 +107,23 @@ public:
 		fopen_s(&pTextFile, txtname.c_str(), txtmod.c_str());
 		ReadImage();
 		ReadText();
+		FindLand();
 #ifdef _W_FILE
-		output.open("output.txt", std::ios::out);
 		WriteFile("output.bmp");
 #endif
-
 	}
+
 	Image(string Iname, string Tname) : Image(Iname, "rb", Tname, "rb") {}
+
 	void ReadImage();
 	void ReadText();
+	void FindLand();
+	float CalcEnergy(const Coord2& origin, const Coord2& target, float energy);
+
 #ifdef _W_FILE
 	void WriteFile(string filename);
 #endif
+
 	~Image() {
 		fclose(pImageFile);
 		fclose(pTextFile);
@@ -127,9 +136,6 @@ public:
 		int a;
 		std::cin >> a;
 		*/
-#endif
-#ifdef _W_FILE
-		output.close();
 #endif
 	}
 };
@@ -179,9 +185,10 @@ void Image::ReadImage() {
 	height = infoHeader.biHeight;
 	const int bitsPerPixel = infoHeader.biBitCount;
 	const int bytesPerPixel = bitsPerPixel / 8;
-	const int pitch = (width * bytesPerPixel + 3) % 4;
+	const int pitch = (width * bytesPerPixel + 3) & ~3;
+	const int padding = pitch - width;
 	const int dataSize = pitch * height;
-	int padding;
+	int trash;
 
 	if (	infoHeader.biPlanes != 1 ||
 		infoHeader.biCompression != 0
@@ -208,6 +215,8 @@ void Image::ReadImage() {
 	}
 
 	Bitmap = (byte**)malloc(sizeof(byte*)* height);
+	Land = (int*)malloc(sizeof(int)*width);
+	memset(Land, -1, sizeof(int) * width);
 
 #ifdef _LOCAL
 	tend = NowTime();
@@ -217,10 +226,16 @@ void Image::ReadImage() {
 	for (int y = height - 1; y >= 0; y--) {
 		Bitmap[y] = (byte*)malloc(sizeof(byte)* width);
 		fread(reinterpret_cast<char*>(Bitmap[y]), sizeof(byte)* width, 1, pImageFile);
-		fread(reinterpret_cast<char*>(&padding), sizeof(byte)* pitch, 1, pImageFile);
+		fread(reinterpret_cast<char*>(&trash), sizeof(byte)* padding, 1, pImageFile);
 	}
 	
 #ifdef _LOCAL
+	vBitmap = std::vector<std::vector<byte> >(height, std::vector<byte>(width, 0));
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++){
+			vBitmap[y][x] = Bitmap[y][x];
+		}
+	}
 	tend = NowTime();
 	out << "Image File Read End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
 #endif
@@ -257,3 +272,71 @@ void Image::ReadText() {
 	out << "Text File Read End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
 #endif
 }
+
+void Image::FindLand() {
+	for (int y = 0; y < height; y++){
+		for (int x = 0; x < width; x++){
+			if (Land[x] == -1 && Bitmap[y][x] == BlackBit) {
+				Land[x] = y;
+			}
+		}
+	}
+
+#ifdef _LOCAL
+	
+	tend = NowTime();
+	out << "Land Find End: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
+#endif
+}
+
+float Image::CalcEnergy(const Coord2& origin, const Coord2& target, float energy) {
+	
+	bool isPos;
+	float airLength, landLength;
+	if (origin.x == target.x) {
+		int pLand = Land[target.x];
+		airLength = origin.y - pLand;
+		landLength = pLand - target.y;
+	}
+	else {
+		float a, b;
+		a = (origin.y - target.y) / (origin.x - target.x);
+		b = origin.y + (-1) * a * origin.x;
+		std::vector<Coord2> sol;
+		int minIndex, maxIndex;
+		if (origin.x > target.x) {
+			minIndex = target.x;
+			maxIndex = origin.x;
+		}
+		else {
+			maxIndex = target.x;
+			minIndex = origin.x;
+		}
+		for (int i = minIndex; i < maxIndex + 1; i++) {
+
+		}
+	}
+	return (energy / airLength) / pow(landLength, 2);
+}
+
+
+#ifdef _W_FILE
+void Image::WriteFile(string filename) {
+	std::ofstream output(filename, std::ios::out);
+
+	output.write(reinterpret_cast<char*>(&fileHeader), sizeof fileHeader);
+	output.write(reinterpret_cast<char*>(&infoHeader), sizeof infoHeader);
+	output.write(reinterpret_cast<char*>(&Pallet), sizeof Pallet);
+
+	const int pitch = (width * infoHeader.biBitCount / 8 + 3) % 4;
+
+	for (int y = height - 1; y >= 0; y--) {
+		output.write(reinterpret_cast<char*> (Bitmap[y]), sizeof(byte)* width);
+		output.write(reinterpret_cast<char*> (Bitmap[y]), pitch);
+	}
+#ifdef _LOCAL
+	tend = NowTime();
+	out << "OutputFile Created: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
+#endif
+}
+#endif
