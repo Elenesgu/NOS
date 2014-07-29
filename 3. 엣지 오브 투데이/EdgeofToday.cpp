@@ -1,6 +1,7 @@
 #include<iostream>
 #include<string>
 #include<vector>
+#include<cmath>
 
 
 using std::endl;
@@ -108,6 +109,7 @@ public:
 		ReadImage();
 		ReadText();
 		FindLand();
+		Calc();
 #ifdef _W_FILE
 		WriteFile("output.bmp");
 #endif
@@ -118,13 +120,16 @@ public:
 	void ReadImage();
 	void ReadText();
 	void FindLand();
-	float CalcEnergy(const Coord2& origin, const Coord2& target, float energy);
+	void Calc();
 
+	float CalcEnergy(const Coord2& origin, const Coord2& target, float energy);
+	void WriteResult();
 #ifdef _W_FILE
 	void WriteFile(string filename);
 #endif
 
 	~Image() {
+		WriteResult();
 		fclose(pImageFile);
 		fclose(pTextFile);
 		for (int i = 0; i < height; i++){
@@ -289,20 +294,33 @@ void Image::FindLand() {
 #endif
 }
 
+void Image::Calc() {
+	for (size_t i = 0; i < Bunker.size(); i++) {
+		for (size_t j = 0; j < UFO.size(); j++) {
+			Bunker[i].energy += CalcEnergy(UFO[j].coord, Bunker[i].coord, UFO[j].energy);
+		}
+#ifdef _LOCAL
+		tend = NowTime();
+		out << i<<"th Bunker time: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
+#endif
+	}
+
+}
+
 float Image::CalcEnergy(const Coord2& origin, const Coord2& target, float energy) {
 	
-	bool isPos;
+	bool isPos, tmpPos;
 	float airLength, landLength;
 	if (origin.x == target.x) {
 		int pLand = Land[target.x];
-		airLength = origin.y - pLand;
-		landLength = pLand - target.y;
+		airLength = static_cast<float>(origin.y - pLand);
+		landLength = static_cast<float>(pLand - target.y);
 	}
 	else {
 		float a, b;
-		a = (origin.y - target.y) / (origin.x - target.x);
-		b = origin.y + (-1) * a * origin.x;
-		std::vector<Coord2> sol;
+		a = static_cast<float>(origin.y - target.y) / static_cast<float>(origin.x - target.x);
+		b = static_cast<float>(origin.y) + (-1) * a * static_cast<float>(origin.x);
+		std::vector<int> sol;
 		int minIndex, maxIndex;
 		if (origin.x > target.x) {
 			minIndex = target.x;
@@ -312,13 +330,37 @@ float Image::CalcEnergy(const Coord2& origin, const Coord2& target, float energy
 			maxIndex = target.x;
 			minIndex = origin.x;
 		}
-		for (int i = minIndex; i < maxIndex + 1; i++) {
-
+		isPos = (Land[minIndex]) > (a * minIndex + b);
+		for (int i = minIndex + 1; i <= maxIndex; i++) {
+			tmpPos = (Land[i]) > (a * i + b);
+			if (tmpPos != isPos) {
+				sol.push_back(i - 1);
+				isPos = tmpPos;
+			}
 		}
+
+		if (sol.size() != 1) {
+			return 0;
+		}
+		float solveX, solveY;
+		solveY = static_cast<float>(Land[sol[0]]);
+		solveX = (solveY - b) / a;
+		airLength = hypot(solveX - static_cast<float>(origin.x), solveY - static_cast<float>(origin.y));
+		landLength = hypot(solveX - static_cast<float>(target.x), solveY - static_cast<float>(target.y));
+
+
 	}
 	return (energy / airLength) / pow(landLength, 2);
 }
 
+void Image::WriteResult() {
+	std::ofstream resultout("output.txt", std::ios::out);
+	resultout << Bunker.size() << endl;
+	for (size_t i = 0; i < Bunker.size(); i++) {
+		resultout << static_cast<int>(Bunker[i].energy) << endl;
+	}
+	resultout.close();
+}
 
 #ifdef _W_FILE
 void Image::WriteFile(string filename) {
