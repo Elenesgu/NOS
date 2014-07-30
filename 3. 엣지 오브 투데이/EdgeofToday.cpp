@@ -2,25 +2,22 @@
 #include<string>
 #include<vector>
 #include<cmath>
+#include<chrono>
+#include<ctime>
+#include<fstream>
 
 
 using std::endl;
 using std::string;
 
-#define _LOCAL
-
 #ifdef _LOCAL
-#include<chrono>
-#include<ctime>
-#include<fstream>
 std::ostream& out = std::cout;
-std::chrono::time_point<std::chrono::system_clock> tstart, tend;
-auto NowTime = std::chrono::system_clock::now;
 #else
-#include<fstream>
 std::ofstream out("output.txt");
 #endif
 
+std::chrono::time_point<std::chrono::system_clock> tstart, tend;
+auto NowTime = std::chrono::system_clock::now;
 
 typedef unsigned char byte;
 typedef unsigned int num;
@@ -137,19 +134,19 @@ public:
 		}
 		free(Bitmap);
 #ifdef _LOCAL
-		/*
+		
 		int a;
 		std::cin >> a;
-		*/
+		
 #endif
 	}
 };
 
 int main() {
 	string IimageName, Itxtname;
+	tstart = NowTime();
 
 #ifdef _LOCAL
-	tstart = NowTime();
 	/*
 	out << "Input World File Name(not include .bmp): ";
 	std::cin >> IimageName;
@@ -192,7 +189,6 @@ void Image::ReadImage() {
 	const int bytesPerPixel = bitsPerPixel / 8;
 	const int pitch = (width * bytesPerPixel + 3) & ~3;
 	const int padding = pitch - width;
-	const int dataSize = pitch * height;
 	int trash;
 
 	if (	infoHeader.biPlanes != 1 ||
@@ -214,7 +210,7 @@ void Image::ReadImage() {
 
 	for (int i = 0; i < 256; i++) {
 		if (Pallet[i].B == 0 && Pallet[i].G == 0 && Pallet[i].R == 0) {
-			BlackBit = i;
+			BlackBit = static_cast<byte>(i);
 			break;
 		}
 	}
@@ -295,12 +291,22 @@ void Image::FindLand() {
 }
 
 void Image::Calc() {
-	for (size_t i = 0; i < Bunker.size(); i++) {
+	for (size_t j = 0; j < UFO.size(); j++) {
+		Bunker[0].energy += CalcEnergy(UFO[j].coord, Bunker[0].coord, UFO[j].energy);
+	}
+	tend = NowTime();
+	auto timeperone = 1.2 * std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count();
+	auto limit = 30000 - timeperone;
+
+	for (size_t i = 1; i < Bunker.size(); i++) {
 		for (size_t j = 0; j < UFO.size(); j++) {
 			Bunker[i].energy += CalcEnergy(UFO[j].coord, Bunker[i].coord, UFO[j].energy);
 		}
-#ifdef _LOCAL
 		tend = NowTime();
+		if (std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() > limit) {
+			break;
+		}
+#ifdef _LOCAL
 		out << i<<"th Bunker time: " << std::chrono::duration_cast<std::chrono::milliseconds>(tend - tstart).count() << "ms" << endl;
 #endif
 	}
