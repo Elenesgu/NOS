@@ -42,6 +42,7 @@ struct Coord2 {
 
 enum Status { alive = 0, danger = 1, dead = 2 };
 
+//Default Unit Structure.
 struct Grid {
 	int value;
 	Status status;
@@ -50,6 +51,7 @@ struct Grid {
 	Grid(const Grid& obj) : Grid(obj.value, obj.status) {}
 };
 
+//Cycling Input Stream.
 class IStream {
 private:
 	const std::array<int, 16U> data{ { 1, 2, 3, 4, 5, 6, 7, 8, 9, 8, 7, 6, 5, 4, 3, 2 } };
@@ -75,42 +77,12 @@ public:
 	};
 };
 
+//To make usase of array easily, I scope map and make functions.
 class RectMap {
-private:	
-	
+private:		
 	const Grid  edgegrid = Grid(INT_MAX, danger);
 	std::array< std::array<Grid, 11U>, 11U> mapdata;
-
-	void CheckStatus(int ay, int ax) {
-		for (int i = 0; i < 2; i++) {
-			for (int j = 0; j < 2; i++) {
-				CheckDanger(ay, ax, ay + 1, ax + 1);
-			}
-		}
-	}
-	
-	inline void CheckDanger(int fy, int fx, int sy, int sx) {
-		Grid* bigger, *smaller;
-		if (mapdata[fy + 1][fx + 1].value > mapdata[sy + 1][sx + 1].value) {
-			bigger = &mapdata[fy + 1][fx + 1];
-			smaller = &mapdata[sy + 1][sx + 1];
-		}
-		else {
-			bigger = &mapdata[sy + 1][sx + 1];
-			smaller = &mapdata[fy + 1][fx + 1];
-		}
-		if (bigger->status == dead || smaller->status == dead) {
-
-		}
-		if (bigger->value - smaller->value >= 10 && bigger->value >= 2 * smaller->value) {
-			smaller->status = danger;
-		}
-		else {
-			smaller->status = alive;
-		}
-	}
 public:
-
 	RectMap() {
 		std::fill(mapdata[0].begin(), mapdata[0].end(), edgegrid);
 		std::fill(mapdata[10].begin(), mapdata[10].end(), edgegrid);
@@ -118,14 +90,6 @@ public:
 			mapdata[i][0] = mapdata[i][10] = edgegrid;
 		}		
 	}
-
-	void TileRect(Coord2& obj, int rectval) {
-		mapdata[obj.y][obj.x].value += rectval;
-		mapdata[obj.y + 1][obj.x].value += rectval;
-		mapdata[obj.y][obj.x + 1].value += rectval;
-		mapdata[obj.y + 1][obj.x + 1].value += rectval;
-	}
-
 #pragma region RectMapOperator
 	std::array<Grid, 11U>& operator[](const int& value){
 		return mapdata[value + 1];
@@ -176,6 +140,60 @@ private:
 
 	void FindPropCoord() {
 
+	}
+
+	//If somerect's status is changed, there are continual changes.
+	//If somerect changes to danger, there might be somerect which changes to danger or dead.
+	//It is a same case if somerect changes to dead.
+	void CheckStatus(int ay, int ax) {
+		for (int i = 0; i < 2; i++) {
+			for (int j = 0; j < 2; i++) {
+				if (!CheckDanger(ay, ax, ay + i, ax + j)){
+					//If StatusChange Occur or some surrounding rect's status is dead, map is additionally checked.
+					//If status is changed to alive from danger, additional check is not needed for dead rect cannot be alive or danger.
+				}
+			}
+		}
+	}
+
+	//Check Two Points if one of them is in danger or not.
+	bool CheckDanger(int fy, int fx, int sy, int sx) {		
+		Grid* bigger, *smaller;
+		if (map[fy][fx].value > map[sy][sx].value) {
+			bigger = &map[fy][fx];
+			smaller = &map[sy][sx];
+		}
+		else {
+			bigger = &map[sy][sx];
+			smaller = &map[fy][fx];
+		}
+		if (bigger->status == dead || smaller->status == dead) {
+			return true;
+		}
+		if (bigger->value - smaller->value >= 10 && bigger->value >= 2 * smaller->value) {
+			smaller->status = danger;
+			return true;
+		}
+		else {
+			smaller->status = alive;	
+			return false;
+		}
+	}
+
+	//Put Rectangle on map. obj means its topleft coord. rectval is value of rect
+	//Status is changed ONLY if surrounding rects' value is changed
+	void TileRect(Coord2& obj, int rectval) {
+		map[obj.y][obj.x].value += rectval;
+		map[obj.y + 1][obj.x].value += rectval;
+		map[obj.y][obj.x + 1].value += rectval;
+		map[obj.y + 1][obj.x + 1].value += rectval;
+		for (int i = 0; i < 2; i++) {
+			for (int j = 0; j < 2; i++) {
+				//surronded rect's value is changed.
+				//then, check changed rect's surrond
+				CheckStatus(obj.y, obj.x);
+			}
+		}
 	}
 
 public:
