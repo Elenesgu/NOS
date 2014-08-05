@@ -80,14 +80,14 @@ public:
 //To make usase of array easily, I scope map and make functions.
 class RectMap {
 private:		
-	const Grid  edgegrid = Grid(INT_MAX, danger);
+	static const Grid  edgegrid;
 	std::array< std::array<Grid, 11U>, 11U> mapdata;
 public:
 	RectMap() {
-		std::fill(mapdata[0].begin(), mapdata[0].end(), edgegrid);
-		std::fill(mapdata[10].begin(), mapdata[10].end(), edgegrid);
+		std::fill(mapdata[0].begin(), mapdata[0].end(), RectMap::edgegrid);
+		std::fill(mapdata[10].begin(), mapdata[10].end(), RectMap::edgegrid);
 		for (int i = 1; i < 10; i++) {			
-			mapdata[i][0] = mapdata[i][10] = edgegrid;
+			mapdata[i][0] = mapdata[i][10] = RectMap::edgegrid;
 		}		
 	}
 #pragma region RectMapOperator
@@ -108,7 +108,10 @@ public:
 	}
 #pragma endregion
 };
+const Grid RectMap::edgegrid(INT_MAX, dead);
 
+
+//Program main algorithm.
 class TileManger {
 private:
 	RectMap map;
@@ -119,7 +122,7 @@ private:
 	static const int maxhistory = 16;
 	static const int maxinven = 5;
 
-	inline bool isValidPoint(const Coord2& topleft){
+	bool isValidPoint(const Coord2& topleft){
 		bool alreadydid = false;
 		for (auto i = recthistory.begin(); i < recthistory.end(); i++) {
 			if (*i == topleft) {
