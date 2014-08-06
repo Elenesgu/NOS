@@ -47,6 +47,7 @@ struct Grid {
 	int value;
 	Status status;
 	Grid() : value(0), status(alive) {}
+	Grid(int i) {}
 	Grid(int av, Status as) : value(av), status(as) {}
 	Grid(const Grid& obj) : Grid(obj.value, obj.status) {}
 };
@@ -79,7 +80,7 @@ public:
 
 //To make usase of array easily, I scope map and make functions.
 class RectMap {
-private:		
+private:	
 	static const Grid  edgegrid;
 	std::array< std::array<Grid, 11U>, 11U> mapdata;
 public:
@@ -88,7 +89,13 @@ public:
 		std::fill(mapdata[10].begin(), mapdata[10].end(), RectMap::edgegrid);
 		for (int i = 1; i < 10; i++) {			
 			mapdata[i][0] = mapdata[i][10] = RectMap::edgegrid;
-		}		
+			mapdata[i][1].status = mapdata[i][9].status = danger;
+			mapdata[1][i].status = mapdata[9][i].status = danger;
+		}
+		mapdata[1][1].status = dead;
+		mapdata[9][1].status = dead;
+		mapdata[1][9].status = dead;
+		mapdata[9][9].status = dead;
 	}
 #pragma region RectMapOperator
 	std::array<Grid, 11U>& operator[](const int& value){
@@ -153,13 +160,18 @@ private:
 			for (int j = 0; j < 2; i++) {
 				if (!CheckDanger(ay, ax, ay + i, ax + j)){
 					//If StatusChange Occur or some surrounding rect's status is dead, map is additionally checked.
-					//If status is changed to alive from danger, additional check is not needed for dead rect cannot be alive or danger.
+					//If status is changed to alive from danger, additional check is not needed for dead rect cannot be alive or danger.					
+					//First two args is one of just tiled rect. So their status cannot be changed to danger or dead.
+					//Howerver, them can be changed to alive form dead.
+					//Therefore, we might just check last two args.
+					CheckDead(ay + i, ax + j);					
 				}
 			}
 		}
 	}
 
 	//Check Two Points if one of them is in danger or not.
+	//true means change occurs
 	bool CheckDanger(int fy, int fx, int sy, int sx) {		
 		Grid* bigger, *smaller;
 		if (map[fy][fx].value > map[sy][sx].value) {
@@ -174,13 +186,55 @@ private:
 			return true;
 		}
 		if (bigger->value - smaller->value >= 10 && bigger->value >= 2 * smaller->value) {
-			smaller->status = danger;
+			if (smaller->status == danger)
+				return false;
+			//if change is not occured, return false.
+			smaller->status = danger;			
 			return true;
 		}
 		else {
+			//If it chang from danger to alive, surrounding rect is not affected.
 			smaller->status = alive;	
 			return false;
 		}
+	}
+
+	bool CheckDead(int ay, int ax){
+		//If Dead rect is found, then additional change can be occured
+	}
+
+	bool MakeDanger(int ay, int ax) {
+		//if any rect is changed into dead, surrounding rects are also changed into danger,
+		//and it is need to checkDead continually.
+
+	}
+
+	bool MakeDead() {
+		3 = 2;
+	}
+
+	bool InDead(const int fy, const int fx){
+		if (map[fy + 1][fx].status != alive&&
+			map[fy - 1][fx].status != alive&&
+			map[fy][fx + 1].status != alive&&
+			map[fy][fx - 1].status != alive) {
+			map[fy][fx].status = dead;
+			return true;
+		}
+		else if (map[fy + 1][fx].status == dead && map[fy - 1][fx].status == dead) {
+			map[fy][fx].status = dead;
+			return true;
+		}
+		else if (map[fy][fx + 1].status == dead && map[fy][fx - 1].status == dead){
+			map[fy][fx].status = dead;
+			return true;
+		}
+		else
+			return false;
+	}
+	
+	bool InDead(const Coord2& obj){
+		return InDead(obj.y, obj.x);
 	}
 
 	//Put Rectangle on map. obj means its topleft coord. rectval is value of rect
@@ -194,7 +248,7 @@ private:
 			for (int j = 0; j < 2; i++) {
 				//surronded rect's value is changed.
 				//then, check changed rect's surrond
-				CheckStatus(obj.y, obj.x);
+				CheckStatus(obj.y + i, obj.x + j);
 			}
 		}
 	}
