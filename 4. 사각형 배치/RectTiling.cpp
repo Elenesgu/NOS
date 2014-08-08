@@ -79,10 +79,9 @@ public:
 };
 
 class ScopedMap : public std::array<Grid, 11U> {
-public:
-	
-	Grid& operator[](const int& v) {		
-		return this->at(v + 1);
+public:	
+	Grid& operator[](const int& v) const {
+		return const_cast<Grid&>(this->at(v + 1));
 	}
 };
 
@@ -116,8 +115,7 @@ public:
 	friend std::ostream& operator << (std::ostream& ostm, const RectMap& obj){
 		for (int y = 1; y < 10; y++) {
 			for (int x = 0; x < 9; x++) {
-				auto tmp = obj.mapdata[y];
-				ostm << tmp[x].value << ", " << tmp[x].status << '\t';
+				ostm << obj.mapdata[y][x].value << ", " << obj.mapdata[y][x].status <<'\t';
 			}
 			ostm << endl;
 		}
@@ -144,10 +142,11 @@ private:
 
 	void MainLogic() {
 #ifdef _LOCAL
-		out << map;
+		out << endl << map;
 #endif
 		nextdanger.clear();
 		nextlive.clear();
+		nextcheck.clear();
 		Coord2 TopLeft;
 		int TileNum;
 #ifdef _LOCAL
@@ -165,7 +164,7 @@ private:
 		rectinven[n] = m;
 		TopLeft = Coord2(a, b);
 #else
-
+		TopLeft = FindPropCoord(TileNum);
 #endif
 		TileRect(TopLeft, TileNum);
 	}
@@ -197,6 +196,11 @@ private:
 				CheckStatus(obj.y + i, obj.x + j);
 			}
 		}
+
+
+#ifdef _LOCAL
+		out << endl <<map;
+#endif
 		for (Grid* obj : nextlive)
 			obj->status = alive;
 		for (Grid* obj : nextdanger)
@@ -205,8 +209,16 @@ private:
 			CheckDead(obj);
 	}
 
-	Coord2 FindPropCoord() {
+	Coord2 FindPropCoord(int& N) {
+		Coord2 PropCoord;
+		int minPrior = INT_MAX;
 
+		for (PropCoord.y = 0; PropCoord.y < 9; PropCoord.y++) {
+			for (PropCoord.x = 0; PropCoord.x < 9; PropCoord.x++) {
+				
+			}
+		}
+		return Coord2(PropCoord);
 	}
 #pragma endregion
 
@@ -323,8 +335,8 @@ first: call A
 		if (map[ay][ax].value == INT_MAX)
 			return;
 		for (int i = -1; i < 2; i+=2) {
-			InDead(ay + i, ay);
-			InDead(ay, ay + i);
+			InDead(ay + i, ax);
+			InDead(ay, ax + i);
 		}
 	}
 
@@ -364,13 +376,13 @@ first: call A
 			//  dead
 			//   &
 			//  dead
-			if (map[fy + 2][fx].status == dead)
+			if (fy != 8 && map[fy + 2][fx].status == dead)
 				MakeDead(fy + 1, fx);
-			if (map[fy - 2][fx].status == dead)
+			if (fy != 0 && map[fy - 2][fx].status == dead)
 				MakeDead(fy - 1, fx);
-			if (map[fy][fx + 2].status == dead)
+			if (fx != 8 && map[fy][fx + 2].status == dead)
 				MakeDead(fy, fx + 1);
-			if (map[fy][fx - 2].status == dead)
+			if (fx != 0 && map[fy][fx - 2].status == dead)
 				MakeDead(fy, fx - 1);
 		}
 	}
