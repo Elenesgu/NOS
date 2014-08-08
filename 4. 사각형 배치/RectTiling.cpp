@@ -49,7 +49,6 @@ struct Grid {
 	Grid() : value(0), status(alive) {}
 	Grid(int i) {}
 	Grid(int av, Status as) : value(av), status(as) {}
-	Grid(const Grid& obj) : Grid(obj.value, obj.status) {}
 };
 
 //Cycling Input Stream.
@@ -136,13 +135,16 @@ private:
 
 	int rectinven[maxinven];	
 	Coord2 recthistory[maxhistory];
-	std::vector<Grid*> nextdanger;
-	std::vector<Grid*> nextlive;
+	int historycounter = 0;
+	std::vector<Coord2> nextdanger;
+	std::vector<Coord2> nextlive;
 	std::vector<Coord2> nextcheck;
 
 	void MainLogic() {
 #ifdef _LOCAL
-		out << endl << map;
+		out << map;
+		static int time = 0;
+		out << time++ << endl;
 #endif
 		nextdanger.clear();
 		nextlive.clear();
@@ -150,6 +152,7 @@ private:
 		Coord2 TopLeft;
 		int TileNum;
 #ifdef _LOCAL
+		/*
 		int a, b, n, m;
 		out << "x, y: ";
 		std::cin >> a >> b;
@@ -163,16 +166,19 @@ private:
 		in >> m;
 		rectinven[n] = m;
 		TopLeft = Coord2(a, b);
+		*/
 #else
 		TopLeft = FindPropCoord(TileNum);
+		out << TopLeft.x << ' ' << TopLeft.y << ' ' << TileNum << endl;
 #endif
+		TopLeft = FindPropCoord(TileNum);
 		TileRect(TopLeft, TileNum);
 	}
 
 #pragma region GamePlay
 	bool isValidPoint(const Coord2& topleft){
-		bool alreadydid = false;
-		return(alreadydid || map[topleft.y - 1][topleft.x].status == dead &&
+		bool alreadydid = !isDone(topleft);
+		return !(alreadydid || map[topleft.y - 1][topleft.x].status == dead &&
 			map[topleft.y - 1][topleft.x + 1].status == dead &&
 			map[topleft.y][topleft.x + 2].status == dead &&
 			map[topleft.y + 1][topleft.x + 2].status == dead &&
@@ -196,29 +202,84 @@ private:
 				CheckStatus(obj.y + i, obj.x + j);
 			}
 		}
-
-
-#ifdef _LOCAL
-		out << endl <<map;
-#endif
-		for (Grid* obj : nextlive)
-			obj->status = alive;
-		for (Grid* obj : nextdanger)
-			obj->status = danger;
+		for (Coord2 obj : nextlive)
+			map[obj.y][obj.x].status = alive;
+		for (Coord2 obj : nextdanger)
+			map[obj.y][obj.x].status = danger;
 		for (Coord2 obj : nextcheck)
 			CheckDead(obj);
 	}
 
 	Coord2 FindPropCoord(int& N) {
-		Coord2 PropCoord;
+		Coord2 tmpCoord, PropCoord;
 		int minPrior = INT_MAX;
 
-		for (PropCoord.y = 0; PropCoord.y < 9; PropCoord.y++) {
-			for (PropCoord.x = 0; PropCoord.x < 9; PropCoord.x++) {
-				
+		for (tmpCoord.y = 1; tmpCoord.y < 8; tmpCoord.y++) {
+			for (tmpCoord.x = 1; tmpCoord.x < 8; tmpCoord.x++) {
+				int tmp = CalcPriority(tmpCoord);
+				if (minPrior > tmp) {
+					if (!isValidPoint(tmpCoord)) {
+						if (tmp == 0) {
+							PropCoord = tmpCoord;
+							break;
+						}
+						else {
+							minPrior = tmp;
+							PropCoord = tmpCoord;
+						}
+					}
+				}
 			}
 		}
+		recthistory[historycounter++] = PropCoord;
+		historycounter %= maxhistory;
+		N = 0;
+		int index = 0, tmp;
+		for (int i = 0; i < maxinven; i++) {
+			if (rectinven[i] < minPrior / 4) {
+				if (N < rectinven[i]) {
+					N = rectinven[i];
+					index = i;
+				}				
+			}
+		}
+		if (N == 0) {
+			N = INT_MAX;
+			for (int i = 0; i < maxinven; i++) {
+				if (N > rectinven[i]) {
+					N = rectinven[i];
+					index = i;
+				}				
+			}
+		}
+		in >> tmp;
+		rectinven[index] = tmp;
 		return Coord2(PropCoord);
+	}
+
+	int CalcPriority(const Coord2& obj) {
+		int prior(0);
+		int cur = map[obj.y][obj.x].value;
+		if (map[obj.y][obj.x].status == dead) {
+			return INT_MAX;
+		}
+		for (int i = -1; i < 2; i += 2) {
+			prior += (map[obj.y + i][obj.x].value - cur) + std::pow(10000000, static_cast<int>(map[obj.y + i][obj.x].status));
+			prior += (map[obj.y][obj.x + i].value - cur) + std::pow(10000000, static_cast<int>(map[obj.y][obj.x + i].status));
+		}
+		if (map[obj.y][obj.x].status == danger)
+			return prior / 1000000;
+		else
+			return prior;
+	}
+
+	bool isDone(const Coord2& obj) {
+		for (Coord2& tgt : recthistory) {
+			if (tgt == obj) {
+				return true;
+			}
+		}
+		return false;
 	}
 #pragma endregion
 
@@ -316,14 +377,14 @@ first: call A
 			if (bigger->status == danger)
 				return false;
 			//if change is not occured, return false.
-			nextdanger.push_back(bigger);
+			nextdanger.push_back(Coord2(bx, by));
 			return true;
 		}
 		else {
 			//If it chang from danger to alive, surrounding rect is not affected.
 			if (bigger->status == danger) {
 				if (!surroundDead(by, bx)) {
-					nextlive.push_back(bigger);
+					nextlive.push_back(Coord2(bx, by));
 				}
 			}
 			return false;
