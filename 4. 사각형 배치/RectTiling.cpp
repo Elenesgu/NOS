@@ -144,7 +144,7 @@ private:
 #ifdef _LOCAL
 		out << map;
 		static int time = 0;
-		out << time++ << endl;
+		out << time++ << ": ";
 #endif
 		nextdanger.clear();
 		nextlive.clear();
@@ -166,26 +166,41 @@ private:
 		in >> m;
 		rectinven[n] = m;
 		TopLeft = Coord2(a, b);
-		*/
+		*/		
+		TopLeft = FindPropCoord(TileNum);
+		out << TopLeft.x << ' ' << TopLeft.y << ' ' << TileNum << endl;
 #else
 		TopLeft = FindPropCoord(TileNum);
 		out << TopLeft.x << ' ' << TopLeft.y << ' ' << TileNum << endl;
 #endif
-		TopLeft = FindPropCoord(TileNum);
+		
 		TileRect(TopLeft, TileNum);
 	}
 
 #pragma region GamePlay
 	bool isValidPoint(const Coord2& topleft){
-		bool alreadydid = !isDone(topleft);
-		return !(alreadydid || map[topleft.y - 1][topleft.x].status == dead &&
+		if (isDone(topleft)) {
+			return false;
+		}
+		return 			
+			!(
+			(
+			map[topleft.y - 1][topleft.x].status == dead &&
 			map[topleft.y - 1][topleft.x + 1].status == dead &&
 			map[topleft.y][topleft.x + 2].status == dead &&
 			map[topleft.y + 1][topleft.x + 2].status == dead &&
 			map[topleft.y + 2][topleft.x + 1].status == dead &&
 			map[topleft.y + 2][topleft.x].status == dead &&
 			map[topleft.y + 1][topleft.x - 1].status == dead &&
-			map[topleft.y][topleft.x - 1].status == dead);
+			map[topleft.y][topleft.x - 1].status == dead
+			)
+			|| 
+			(
+			map[topleft.y][topleft.x].status == dead ||
+			map[topleft.y + 1][topleft.x].status == dead ||
+			map[topleft.y][topleft.x + 1].status == dead ||
+			map[topleft.y + 1][topleft.x + 1].status == dead
+			));
 	}
 
 	//Put Rectangle on map. obj means its topleft coord. rectval is value of rect
@@ -212,21 +227,22 @@ private:
 
 	Coord2 FindPropCoord(int& N) {
 		Coord2 tmpCoord, PropCoord;
-		int minPrior = INT_MAX;
+		int maxPrior = -INT_MAX;
 
 		for (tmpCoord.y = 1; tmpCoord.y < 8; tmpCoord.y++) {
 			for (tmpCoord.x = 1; tmpCoord.x < 8; tmpCoord.x++) {
 				int tmp = CalcPriority(tmpCoord);
-				if (minPrior > tmp) {
-					if (!isValidPoint(tmpCoord)) {
-						if (tmp == 0) {
-							PropCoord = tmpCoord;
-							break;
-						}
-						else {
-							minPrior = tmp;
-							PropCoord = tmpCoord;
-						}
+				if (tmp == 0) {
+					if (isValidPoint(tmpCoord)) {
+						PropCoord = tmpCoord;
+						tmpCoord.y = 100;
+						break;
+					}
+				}
+				if (maxPrior < tmp) {
+					if (isValidPoint(tmpCoord)) {
+						maxPrior = tmp;
+						PropCoord = tmpCoord;
 					}
 				}
 			}
@@ -235,12 +251,31 @@ private:
 		historycounter %= maxhistory;
 		N = 0;
 		int index = 0, tmp;
-		for (int i = 0; i < maxinven; i++) {
-			if (rectinven[i] < minPrior / 4) {
-				if (N < rectinven[i]) {
+		if (map[PropCoord.y - 1][PropCoord.x].status == danger ||
+			map[PropCoord.y - 1][PropCoord.x + 1].status == danger ||
+			map[PropCoord.y][PropCoord.x - 1].status == danger ||
+			map[PropCoord.y][PropCoord.x + 2].status == danger ||
+			map[PropCoord.y + 1][PropCoord.x - 1].status == danger ||
+			map[PropCoord.y + 1][PropCoord.x + 2].status == danger ||
+			map[PropCoord.y + 2][PropCoord.x].status == danger ||
+			map[PropCoord.y + 2][PropCoord.x + 1].status == danger
+			) {
+			N = INT_MAX;
+			for (int i = 0; i < maxinven; i++) {
+				if (N > rectinven[i]) {
 					N = rectinven[i];
 					index = i;
-				}				
+				}
+			}
+		}
+		else {
+			for (int i = 0; i < maxinven; i++) {
+				if (rectinven[i] < maxPrior / 8) {
+					if (N < rectinven[i]) {
+						N = rectinven[i];
+						index = i;
+					}
+				}
 			}
 		}
 		if (N == 0) {
@@ -259,23 +294,96 @@ private:
 
 	int CalcPriority(const Coord2& obj) {
 		int prior(0);
+		int inSurD = 0;
 		int cur = map[obj.y][obj.x].value;
-		if (map[obj.y][obj.x].status == dead) {
-			return INT_MAX;
+		if (map[obj.y][obj.x].status == dead ||
+			map[obj.y + 1][obj.x].status == dead || 
+			map[obj.y][obj.x + 1].status == dead || 
+			map[obj.y + 1][obj.x + 1].status == dead ||
+			map[obj.y - 1][obj.x - 1].status == dead ||
+			map[obj.y - 1][obj.x + 2].status == dead ||
+			map[obj.y + 2][obj.x - 1].status == dead ||
+			map[obj.y + 2][obj.x + 2
+			].status == dead) {
+			return -INT_MAX;
 		}
-		for (int i = -1; i < 2; i += 2) {
-			prior += (map[obj.y + i][obj.x].value - cur) + std::pow(10000000, static_cast<int>(map[obj.y + i][obj.x].status));
-			prior += (map[obj.y][obj.x + i].value - cur) + std::pow(10000000, static_cast<int>(map[obj.y][obj.x + i].status));
+		prior += (map[obj.y - 1][obj.x].value - cur);
+
+		prior += (map[obj.y - 1][obj.x + 1].value - cur);
+		prior += (map[obj.y][obj.x + 2].value - cur);
+
+		prior += (map[obj.y + 1][obj.x + 2].value - cur);
+
+		prior += (map[obj.y + 2][obj.x + 1].value - cur);
+
+		prior += (map[obj.y + 2][obj.x].value - cur);
+
+		prior += (map[obj.y + 1][obj.x - 1].value - cur);
+
+		prior += (map[obj.y][obj.x - 1].value - cur);
+		/*
+		prior += (map[obj.y - 1][obj.x].value - cur);
+		if (map[obj.y - 1][obj.x].status != alive) {
+			if (isSurDead(obj.y - 1, obj.x)) inSurD++;
 		}
-		if (map[obj.y][obj.x].status == danger)
-			return prior / 1000000;
-		else
-			return prior;
+
+		prior += (map[obj.y - 1][obj.x + 1].value - cur);
+		if (map[obj.y - 1][obj.x + 1].status != alive) {
+			if (isSurDead(obj.y - 1, obj.x) + 1) inSurD++;
+		}
+
+		prior += (map[obj.y][obj.x + 2].value - cur);
+		if (map[obj.y][obj.x + 2].status != alive) {
+			if (isSurDead(obj.y, obj.x + 2)) inSurD++;
+		}
+
+		prior += (map[obj.y + 1][obj.x + 2].value - cur);
+		if (map[obj.y + 1][obj.x + 2].status != alive) {
+			if (isSurDead(obj.y + 1, obj.x + 2)) inSurD++;
+		}
+
+		prior += (map[obj.y + 2][obj.x + 1].value - cur);
+		if (map[obj.y + 2][obj.x + 1].status != alive) {
+			if (isSurDead(obj.y + 2, obj.x + 1)) inSurD++;
+		}
+
+		prior += (map[obj.y + 2][obj.x].value - cur);
+		if (map[obj.y + 2][obj.x].status != alive) {
+			if (isSurDead(obj.y + 2, obj.x)) inSurD++;
+		}
+
+		prior += (map[obj.y + 1][obj.x - 1].value - cur);
+		if (map[obj.y + 1][obj.x - 1].status != alive) {
+			if (isSurDead(obj.y + 1, obj.x - 1)) inSurD++;
+		}
+		
+		prior += (map[obj.y][obj.x - 1].value - cur);
+		if (map[obj.y][obj.x - 1].status != alive) {
+			if (isSurDead(obj.y, obj.x - 1)) inSurD++;
+		}
+	
+		if (inSurD == 0) return prior;
+		else return (-1000000) * inSurD;
+		*/
+		return prior;
+		
 	}
 
 	bool isDone(const Coord2& obj) {
-		for (Coord2& tgt : recthistory) {
-			if (tgt == obj) {
+		for (int i = 0; i < maxhistory; i++) {
+			if (recthistory[i] == obj) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	inline bool isSurDead(int ay, int ax) {
+		for (int i = -1; i < 2; i += 2) {
+			if (map[ay + i][ax].status == dead) {
+				return true;
+			}
+			if (map[ay][ax + i].status == dead) {
 				return true;
 			}
 		}
